@@ -1,6 +1,7 @@
 import { CalendarDays, CheckCircle2, Copy, Gavel, LayoutGrid, MapPin, MonitorPlay, Plus, Radio, Search, Settings2, Sparkles, Trash2, Trophy, Users } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { ScreenLink } from '../components/ScreenLink';
 import { Drawer, EmptyState, Segmented, StatCard } from '../components/ui';
 import { APP_NAME } from '../brand';
 import { createBlankState, createDummyState } from '../data/dummy';
@@ -156,7 +157,7 @@ function AuctionCard({ a }: { a: AuctionMeta }) {
           <Link className={'btn btn-sm ' + (live ? 'btn-accent' : 'btn-primary')} to={base + (live ? '/console' : a.status === 'finished' ? '/results' : '')}>
             {live ? 'Go to console' : a.status === 'finished' ? 'View results' : 'Open'}
           </Link>
-          <a className="btn btn-sm btn-icon" href={base + '/live'} target="_blank" rel="noreferrer" aria-label="Open live screen" title="Live screen"><MonitorPlay size={15} /></a>
+          <ScreenLink className="btn btn-sm btn-icon" to={base + '/live'} aria-label="Open live screen" title="Live screen"><MonitorPlay size={15} /></ScreenLink>
           <span className="spacer" />
           <button
             className="btn btn-ghost btn-sm btn-icon"

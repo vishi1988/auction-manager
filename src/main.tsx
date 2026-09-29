@@ -1,6 +1,7 @@
 import { StrictMode, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { EMBED } from './components/ScreenLink';
 import { AuctionRoute } from './components/AuctionRoute';
 import { AppLayout, AuctionLayout } from './components/Layout';
 import './styles/app.css';
@@ -30,9 +31,15 @@ function Loading() {
   );
 }
 
+// The embed preview lives in a sandboxed frame with no server behind it, so it
+// keeps the route in the URL hash. The normal build uses real paths.
+function Router({ children }: { children: React.ReactNode }) {
+  return EMBED ? <HashRouter>{children}</HashRouter> : <BrowserRouter basename={import.meta.env.BASE_URL}>{children}</BrowserRouter>;
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
+    <Router>
       <Suspense fallback={<Loading />}>
         <Routes>
           <Route element={<AppLayout />}>
@@ -57,6 +64,6 @@ createRoot(document.getElementById('root')!).render(
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
-    </BrowserRouter>
+    </Router>
   </StrictMode>,
 );

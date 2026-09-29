@@ -1,6 +1,7 @@
 import { AlertTriangle, Camera, ClipboardList, FileSpreadsheet, Info, Link2, MoreHorizontal, Pencil, Plus, Search, Trash2, Upload, UserPlus } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { useAuctionPath } from '../components/AuctionRoute';
+import { ScreenLink, shareUrl } from '../components/ScreenLink';
 import { Drawer, EmptyState, PlayerAvatar, Toast, copyText, useToast } from '../components/ui';
 import { sportOf } from '../data/sports';
 import { downloadTemplate, readPlayersFile, templateColumns } from '../lib/excel';
@@ -99,7 +100,7 @@ export function Players() {
     setEditing(null);
   };
 
-  const copyRegistration = () => copyText(location.origin + path('/register'), showToast, 'Registration link copied');
+  const copyRegistration = () => copyText(shareUrl(path('/register')), showToast, 'Registration link copied');
   const closeMenu = (e: React.MouseEvent) => (e.currentTarget.closest('details') as HTMLDetailsElement | null)?.removeAttribute('open');
   const onHold = players.filter((p) => p.status === 'hold').length;
 
@@ -120,7 +121,7 @@ export function Players() {
             <div className="menu-list">
               <button onClick={(e) => { closeMenu(e); downloadTemplate(sport); }}><FileSpreadsheet size={16} />Download Excel template</button>
               <button onClick={(e) => { closeMenu(e); copyRegistration(); }}><Link2 size={16} />Copy registration form link</button>
-              <a href={path('/register')} target="_blank" rel="noreferrer"><ClipboardList size={16} />Open registration form ↗</a>
+              <ScreenLink to={path('/register')}><ClipboardList size={16} />Open registration form ↗</ScreenLink>
             </div>
           </details>
           <button className="btn" onClick={() => fileRef.current?.click()} title={'Columns: ' + templateColumns(sport).join(', ')}><Upload size={16} />Import Excel</button>

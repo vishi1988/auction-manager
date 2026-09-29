@@ -7,6 +7,7 @@
     "dev": "vite --host",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
+    "build:embed": "node scripts/build-embed.mjs",
     "preview": "vite preview --host",
     "test": "vitest run"
   },

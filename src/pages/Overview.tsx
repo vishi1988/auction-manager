@@ -2,6 +2,7 @@ import { ArrowRight, CalendarDays, Check, ClipboardList, Copy, Gavel, MapPin, Mo
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuctionPath } from '../components/AuctionRoute';
+import { ScreenLink, shareUrl } from '../components/ScreenLink';
 import { StatCard, Toast, copyText, useToast } from '../components/ui';
 import { sportOf } from '../data/sports';
 import { money } from '../lib/format';
@@ -80,7 +81,7 @@ export function Overview() {
           </p>
         </div>
         <div className="row">
-          <a className="btn" href={path('/live')} target="_blank" rel="noreferrer"><MonitorPlay size={16} />Live screen</a>
+          <ScreenLink className="btn" to={path('/live')}><MonitorPlay size={16} />Live screen</ScreenLink>
           {auction.status === 'finished' ? (
             <Link className="btn btn-primary btn-lg" to={path('/results')}><Trophy size={18} />View results</Link>
           ) : (
@@ -136,10 +137,10 @@ export function Overview() {
                 <strong style={{ display: 'block', fontSize: 14 }}>{l.label}</strong>
                 <span className="muted" style={{ fontSize: 12.5 }}>{l.hint}</span>
               </span>
-              <button className="btn btn-sm btn-icon" aria-label={'Copy ' + l.label + ' link'} title="Copy link" onClick={() => copyText(location.origin + path(l.path), showToast, l.label + ' link copied')}>
+              <button className="btn btn-sm btn-icon" aria-label={'Copy ' + l.label + ' link'} title="Copy link" onClick={() => copyText(shareUrl(path(l.path)), showToast, l.label + ' link copied')}>
                 <Copy size={15} />
               </button>
-              <a className="btn btn-sm" href={path(l.path)} target="_blank" rel="noreferrer">Open</a>
+              <ScreenLink className="btn btn-sm" to={path(l.path)}>Open</ScreenLink>
             </div>
           ))}
           <Link className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start' }} to={path('/settings?tab=screen')}>

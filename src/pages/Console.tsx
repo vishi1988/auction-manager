@@ -2,6 +2,7 @@ import { ArrowRight, Gavel, Info, Keyboard, MonitorPlay, Pause, Play, SkipForwar
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuctionPath } from '../components/AuctionRoute';
+import { ScreenLink } from '../components/ScreenLink';
 import { EmptyState, PlayerAvatar, TeamBadge, TimerRing, Toast, useCountdown, useToast } from '../components/ui';
 import * as A from '../lib/auction';
 import { amountShort, money } from '../lib/format';
@@ -102,7 +103,7 @@ export function Console() {
         )}
         {auction.status === 'live' && <button className="btn btn-sm" onClick={() => update((s) => A.pauseAuction(s, now()))}><Pause size={15} />Pause</button>}
         {auction.status === 'paused' && <button className="btn btn-sm btn-primary" onClick={() => update((s) => A.resumeAuction(s, now()))}><Play size={15} />Resume</button>}
-        <a className="btn btn-sm" href={path('/live')} target="_blank" rel="noreferrer"><MonitorPlay size={15} /><span className="hide-mobile">Live screen</span></a>
+        <ScreenLink className="btn btn-sm" to={path('/live')}><MonitorPlay size={15} /><span className="hide-mobile">Live screen</span></ScreenLink>
       </div>
 
       {auction.status === 'paused' && <div className="banner banner-cream"><Pause size={18} /><span><strong>Paused.</strong> Bids are blocked and the timer is stopped until you resume.</span></div>}
@@ -385,7 +386,7 @@ function StartScreen({ state }: { state: AppState }) {
           </p>
         </div>
         <div className="row">
-          <a className="btn" style={{ background: 'transparent', color: '#fff', borderColor: '#34425c' }} href={path('/live')} target="_blank" rel="noreferrer"><MonitorPlay size={16} />Open live screen</a>
+          <ScreenLink className="btn btn-on-dark" to={path('/live')}><MonitorPlay size={16} />Open live screen</ScreenLink>
           <button className="btn btn-accent btn-lg" disabled={!!blocked} title={blocked} onClick={() => update((s) => A.startAuction(s, now()))}>
             <Play size={18} />Start auction
           </button>

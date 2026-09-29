@@ -5,6 +5,7 @@ import { APP_NAME, APP_TAGLINE } from '../brand';
 import { sportOf } from '../data/sports';
 import { useAppState } from '../store/store';
 import { useAuctionPath } from './AuctionRoute';
+import { ScreenLink } from './ScreenLink';
 
 function Shell({ sidebar, title }: { sidebar: ReactNode; title: string }) {
   const [open, setOpen] = useState(false);
@@ -97,8 +98,8 @@ export function AuctionLayout() {
             <Gavel size={18} />Auction console
             {live && <span className="count" style={{ background: '#ef4444', color: '#fff' }}>LIVE</span>}
           </NavLink>
-          <a href={path('/live')} target="_blank" rel="noreferrer" className="nav-item"><MonitorPlay size={18} />Live screen ↗</a>
-          <a href={path('/owner')} target="_blank" rel="noreferrer" className="nav-item"><UsersRound size={18} />Owner bidding ↗</a>
+          <ScreenLink to={path('/live')} className="nav-item"><MonitorPlay size={18} />Live screen ↗</ScreenLink>
+          <ScreenLink to={path('/owner')} className="nav-item"><UsersRound size={18} />Owner bidding ↗</ScreenLink>
 
           <div className="nav-label">After</div>
           <NavLink to={path('/results')} className="nav-item"><Trophy size={18} />Results</NavLink>
