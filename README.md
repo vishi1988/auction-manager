@@ -33,6 +33,31 @@ Then open http://localhost:5173.
 | `src/pages/` | One file per screen |
 | `src/data/` | Demo data and the list of sports |
 | `src/brand.ts` | Product name — change it here |
+| `src/firebase/config.ts` | Firebase project keys — empty means local mode |
+| `firestore.rules` | Who may read and write auctions in the cloud |
+| `firebase.json` | Hosting and rules settings for `npm run deploy` |
 
-Data is currently saved in the browser on this computer. Use **Account → Download backup**
-before clearing browser data or moving to another computer.
+## Where data is saved
+
+**Local mode (default).** Data is saved in the browser on this computer. Use
+**Account → Download backup** before clearing browser data or moving to another computer.
+
+**Cloud sync (optional).** When the keys in `src/firebase/config.ts` are filled in, auctions
+are also saved in Firebase. There is no login: each browser gets a silent anonymous identity.
+
+- The browser that created an auction is the only one that can change it.
+- Any device that has the auction's link can watch it (for example the Live screen).
+- The auction keeps running without internet and catches up when it is back.
+- Clearing the organiser browser's data loses the right to change its cloud auctions, so
+  still download a backup.
+
+### Turning cloud sync on
+
+1. In the [Firebase console](https://console.firebase.google.com) create a project (free Spark plan).
+2. **Build → Authentication → Get started → Sign-in method → Anonymous → Enable.**
+3. **Build → Firestore Database → Create database** (production mode, region `asia-south1`).
+4. **Project settings → Your apps → Web (`</>`)**, register an app, and copy the `firebaseConfig`
+   values into `src/firebase/config.ts`.
+5. In a terminal: `npx firebase-tools login`, then `npx firebase-tools use --add` and pick the project.
+6. `npm run deploy` publishes the security rules and puts the app on `https://<project>.web.app`.
+7. In the app, **Account → Upload auctions to the cloud** moves existing auctions over.

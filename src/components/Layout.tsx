@@ -3,7 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { APP_NAME, APP_TAGLINE } from '../brand';
 import { sportOf } from '../data/sports';
-import { useAppState } from '../store/store';
+import { useAppState, useAuctionStatus, useCloudInfo } from '../store/store';
 import { useAuctionPath } from './AuctionRoute';
 import { ScreenLink } from './ScreenLink';
 
@@ -22,7 +22,7 @@ function Shell({ sidebar, title }: { sidebar: ReactNode; title: string }) {
           </span>
         </Link>
         {sidebar}
-        <div className="sidebar-foot">Free plan · all features</div>
+        <div className="sidebar-foot"><CloudLine /></div>
       </aside>
       <div className="scrim" onClick={() => setOpen(false)} />
       <div className="main">
@@ -36,6 +36,14 @@ function Shell({ sidebar, title }: { sidebar: ReactNode; title: string }) {
       </div>
     </div>
   );
+}
+
+/** One line at the bottom of the menu saying where the data is being saved. */
+function CloudLine() {
+  const { enabled, status } = useCloudInfo();
+  if (!enabled) return <>Saved on this device only</>;
+  if (status.kind === 'error') return <Link to="/account" style={{ color: '#ff8f84' }}>Cloud sync problem · see Account</Link>;
+  return <>{status.kind === 'on' ? 'Cloud sync on' : 'Connecting to cloud…'}</>;
 }
 
 /** Layout for pages outside a single auction (My Auctions, Account). */
@@ -64,6 +72,7 @@ function Step({ n, done }: { n: number; done: boolean }) {
 export function AuctionLayout() {
   const { settings, auction, teams, players } = useAppState();
   const path = useAuctionPath();
+  const viewOnly = useAuctionStatus() === 'view-only';
   const detailsDone = !!settings.name && !!settings.date;
   const teamsDone = teams.length >= 2;
   const playersDone = teams.length > 0 && players.length >= teams.length * settings.minSquad;
@@ -85,6 +94,7 @@ export function AuctionLayout() {
               <span className="pill pill-blue">{sportOf(settings.sport).name}</span>
               {statusPill}
             </span>
+            {viewOnly && <span className="hint">View only: this auction is run from another device, so changes made here are not saved.</span>}
           </div>
           <NavLink to={path('')} end className="nav-item"><LayoutDashboard size={18} />Overview</NavLink>
 

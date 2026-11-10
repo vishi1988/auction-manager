@@ -1,18 +1,33 @@
 import { ArrowLeft } from 'lucide-react';
+import { useEffect } from 'react';
 import { Link, Outlet, useLocation, useParams } from 'react-router-dom';
-import { openAuction } from '../store/store';
+import { openAuction, useAuctionStatus, watchAuction } from '../store/store';
 import { EMBED } from './ScreenLink';
 
 /** Opens the auction named in the URL for everything rendered inside it. */
 export function AuctionRoute() {
   const { auctionId = '' } = useParams();
   const { pathname } = useLocation();
-  if (!openAuction(auctionId)) {
+  openAuction(auctionId);
+  const status = useAuctionStatus();
+  // With cloud sync, an auction made on another device arrives a moment later.
+  useEffect(() => watchAuction(auctionId), [auctionId]);
+  if (status === 'loading') {
+    return (
+      <main className="page">
+        <div className="empty" style={{ minHeight: '50vh', justifyContent: 'center' }}>
+          <span className="live-dot" style={{ background: 'var(--primary)' }} />
+          <p>Opening the auction…</p>
+        </div>
+      </main>
+    );
+  }
+  if (status === 'missing') {
     return (
       <main className="page">
         <div className="empty">
           <h1 className="display" style={{ fontSize: 36, color: 'var(--ink)' }}>Auction not found</h1>
-          <p>It may have been deleted, or the link is from another device.</p>
+          <p>It may have been deleted, the link may be from another device, or the internet may be off.</p>
           <Link className="btn btn-primary" to="/">Go to My Auctions</Link>
         </div>
       </main>

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Toast, useToast } from '../components/ui';
-import { exportAccount, importAccount, updateIndex, useIndex, type AccountBackup } from '../store/store';
+import { exportAccount, importAccount, updateIndex, uploadLocalAuctions, useCloudInfo, useIndex, type AccountBackup } from '../store/store';
 import type { Organizer } from '../types';
 
 export function Account() {
@@ -8,6 +8,14 @@ export function Account() {
   const [form, setForm] = useState<Organizer>(organizer);
   const [toast, showToast] = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
+  const cloud = useCloudInfo();
+  const localOnly = auctions.filter((a) => !cloud.synced.includes(a.id)).length;
+  const plural = (n: number) => `${n} auction${n === 1 ? '' : 's'}`;
+
+  const upload = () => {
+    const n = uploadLocalAuctions();
+    showToast(n ? `Uploading ${plural(n)} to the cloud` : 'Nothing to upload');
+  };
   const set = (k: keyof Organizer, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const save = (e: React.FormEvent) => {
@@ -68,10 +76,31 @@ export function Account() {
 
       <section className="card">
         <h2>Your data</h2>
-        <p className="hint" style={{ fontSize: 14 }}>
-          Right now your {auctions.length} auction{auctions.length === 1 ? ' is' : 's are'} saved in this browser on this device.
-          Download a backup before clearing browser data or moving to another computer. Online login and sync are coming soon.
-        </p>
+        {!cloud.enabled ? (
+          <p className="hint" style={{ fontSize: 14 }}>
+            Your {plural(auctions.length)} {auctions.length === 1 ? 'is' : 'are'} saved in this browser on this device.
+            Download a backup before clearing browser data or moving to another computer.
+          </p>
+        ) : (
+          <>
+            <div className="row">
+              {cloud.status.kind === 'on' ? <span className="pill pill-green">Cloud sync on</span>
+                : cloud.status.kind === 'error' ? <span className="pill pill-red">Cloud sync problem</span>
+                  : <span className="pill pill-grey">Connecting…</span>}
+              <span>{plural(auctions.length - localOnly)} saved in the cloud{localOnly ? `, ${localOnly} only on this device` : ''}.</span>
+            </div>
+            {cloud.status.kind === 'error' && <div className="banner banner-cream">{cloud.status.message} Your auctions are still safe in this browser.</div>}
+            <p className="hint" style={{ fontSize: 14 }}>
+              Auctions in the cloud can be watched on any device that has the link, for example the Live screen on a projector laptop.
+              Only this browser can change them, because there is no login yet: keep downloading a backup, and do not clear this browser’s data.
+            </p>
+            {localOnly > 0 && (
+              <div className="row">
+                <button className="btn btn-primary" onClick={upload}>Upload {plural(localOnly)} to the cloud</button>
+              </div>
+            )}
+          </>
+        )}
         <div className="row">
           <button className="btn" onClick={download}>Download backup of all auctions</button>
           <button className="btn" onClick={() => fileRef.current?.click()}>Restore from backup</button>

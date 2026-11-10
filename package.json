@@ -9,9 +9,11 @@
     "typecheck": "tsc --noEmit",
     "build:embed": "node scripts/build-embed.mjs",
     "preview": "vite preview --host",
-    "test": "vitest run"
+    "test": "vitest run",
+    "deploy": "npm run build && npx firebase-tools deploy"
   },
   "dependencies": {
+    "firebase": "^13.2.0",
     "lucide-react": "^1.48.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
