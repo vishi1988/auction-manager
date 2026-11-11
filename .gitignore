@@ -9,3 +9,8 @@ dist-embed
 server/api/config.php
 dist-hostinger
 dist-hostinger.zip
+
+marketing/video/node_modules
+marketing/video/frames
+marketing/*.mp4
+marketing/video/*.wav

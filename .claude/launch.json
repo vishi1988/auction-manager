@@ -14,6 +14,12 @@
       "port": 5174
     },
     {
+      "name": "site-static",
+      "runtimeExecutable": "C:\\Users\\VISHAL\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+      "runtimeArgs": ["-m", "http.server", "8123", "--directory", "dist-hostinger"],
+      "port": 8123
+    },
+    {
       "name": "php-api",
       "runtimeExecutable": "C:\\Users\\VISHAL\\AppData\\Local\\Temp\\claude\\cd31b463b21d6560\\1ea82afa-12b4-47ae-9d4d-751f9c56ab5b\\scratchpad\\php\\php.exe",
       "runtimeArgs": ["-S", "127.0.0.1:8099", "-t", "server"],

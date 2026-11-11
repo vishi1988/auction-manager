@@ -8,7 +8,7 @@ export const abs = (path) => SITE.url + path;
 
 const UI = {
   en: {
-    nav: [['/features/', 'Features'], ['/#sports', 'Sports'], ['/pricing/', 'Pricing'], ['/faq/', 'FAQ'], ['/contact/', 'Contact']],
+    nav: [['/features/', 'Features'], ['/#sports', 'Sports'], ['/blog/', 'Blog'], ['/pricing/', 'Pricing'], ['/faq/', 'FAQ'], ['/contact/', 'Contact']],
     cta: 'Start free auction',
     skip: 'Skip to content',
     footSports: 'Auctions by sport',
@@ -136,6 +136,11 @@ ${page.body}
           <a href="/how-it-works/">${esc(ui.howTo)}</a>
           <a href="/pricing/">Pricing</a>
           <a href="/faq/">FAQ</a>
+          <a href="/blog/">Blog and guides</a>
+          <a href="/excel-vs-player-auction-software/">Excel vs software</a>
+          <a href="/corporate-cricket-auction/">Corporate cricket auction</a>
+          <a href="/school-college-sports-auction/">School and college auction</a>
+          <a href="/society-and-village-league-auction/">Society and village leagues</a>
           <a href="/app/">Open the app</a>
         </div>
         <div>

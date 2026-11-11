@@ -1,6 +1,7 @@
 // Every public page of the website: words, SEO titles and structured data.
 // Only describe what the app really does today.
 import { SITE } from './config.mjs';
+import { extraPages } from './content-extra.mjs';
 import { abs, contactLines, esc } from './layout.mjs';
 
 // ---------- building blocks ----------
@@ -91,7 +92,7 @@ const ctaBand = (title, text, button = 'Start a free auction') => `
       <section class="band">
         <div class="wrap band-in">
           <div><h2>${esc(title)}</h2><p>${text}</p></div>
-          <a class="btn btn-gold" href="/app/">${esc(button)}</a>
+          <span class="band-btns"><a class="btn btn-gold" href="/app/">${esc(button)}</a>${SITE.whatsapp ? ` <a class="btn btn-ghost" href="https://wa.me/${SITE.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent('Hi, I want a demo of KhiladiAuction')}">Request a demo on WhatsApp</a>` : ''}</span>
         </div>
       </section>`;
 
@@ -112,7 +113,8 @@ const FEATURES_EN = [
   ['Categories and base prices', 'Marquee, A, B or your own groups, each with a base price, raise step, players-per-team limits and an upper price limit.'],
   ['Lucky draw at the upper limit', 'When the bidding reaches the limit, every team that still wants the player goes into a fortune-wheel draw. All screens show the same spin and winner.'],
   ['Fast bidding', 'Tap the team that raised its paddle or press its keyboard key. Undo works on bids, SOLD and UNSOLD, so a mistake never stops the show.'],
-  ['Excel in, Excel out', 'Download the players template, fill it (or paste your Google Form responses) and import. Export the full results to Excel at the end.'],
+  ['Player registration link', 'Send one link on WhatsApp. Players fill name, role, photo, jersey and T-shirt size (or type their own size) on their phones, and can order extra T-shirts for themselves or for non-players. You check each form before it enters the auction.'],
+  ['Excel in, Excel out', 'Download the players template, fill it (or paste your Google Form responses) and import. Export the full results and the T-shirt order list to Excel.'],
   ['Share the live link', 'Send the live screen link on WhatsApp. Team owners and supporters watch every bid on their phones; phone numbers stay private.'],
   ['Works without internet', 'The auction runs in the laptop’s browser, so a weak network at the ground doesn’t stop it. The online copy catches up when the connection is back.'],
 ];
@@ -127,6 +129,7 @@ const STEPS_EN = [
 const FAQ_EN = [
   ['Is KhiladiAuction free?', 'Yes. It is free during our launch, with every feature and no limit on auctions, teams or players.'],
   ['Do I need internet at the ground?', 'No. The auction runs in your laptop’s browser. Internet is only needed to share the live link with phones, and the online copy catches up when the connection returns.'],
+  ['Can players register themselves, and can they order T-shirts?', 'Yes. Share the registration link; players enter their details, photo, jersey name and number and T-shirt size, and can add extra T-shirts for themselves or for people who are not playing. You download the T-shirt list in Excel with a count for each size.'],
   ['Which sports does it support?', 'Cricket, kabaddi, football, volleyball, hockey, basketball and badminton, plus any other sport with simple player roles.'],
   ['Can team owners bid from their own phones?', 'Not yet. The organiser enters each bid on the laptop as owners raise their paddles, which is how most local auctions run. Owners and fans can watch the live screen on their phones through the link.'],
   ['Can I use points instead of money?', 'Yes. Choose ₹ Crore, ₹ Lakh or points when you create the auction.'],
@@ -147,7 +150,7 @@ const SPORTS = [
     description: 'Run an IPL-style cricket player auction for your box cricket, tennis-ball or corporate league. Purse, categories, live bidding, SOLD screen. Free to start.',
     h1: 'Cricket player auction app for local leagues',
     lead: 'Box cricket, tennis-ball tournaments, gully premier leagues and corporate cups: run the player auction with a live projector screen, just like the IPL.',
-    roles: ['Batsman', 'Bowler', 'All-rounder', 'Wicket-keeper'],
+    roles: ['Batsman', 'Bowler', 'All-rounder', 'Wicket-keeper', 'Fielder'],
     extra: 'Cricket players also carry batting hand and bowling style, shown on the live screen as each player comes up.',
     setup: [['Teams', '8'], ['Purse', '₹10 Cr per team'], ['Squad', '11 to 14 players'], ['Categories', 'Marquee ₹50 L · A ₹30 L · B ₹20 L · C ₹10 L']],
     faq: [
@@ -185,7 +188,7 @@ const SPORTS = [
     faq: [
       ['How do I make sure every team gets a goalkeeper?', 'Create a goalkeeper category and set its minimum per team to 1. The app reserves purse for it so teams can’t spend everything first.'],
       ['Can I run several rounds for unsold players?', 'Yes. Turn on re-auction and unsold players come back in the next round.'],
-      ['Can the players register themselves?', 'Not online yet. Collect names with a Google Form and import them with the Excel template.'],
+      ['Can the players register themselves?', 'Yes. Send the registration link on WhatsApp; players fill it on their phones and you review each form before it enters the auction. You can also import players from Excel.'],
     ],
   },
   {
@@ -402,7 +405,19 @@ function home(lang) {
           ${sportCards(lang)}
         </div>
       </section>
-      <section class="sec sec-tint">
+${lang === 'en' ? `      <section class="sec sec-tint">
+        <div class="wrap">
+          <h2 class="sec-title">Made for Indian local leagues</h2>
+          <p class="sec-lead">Money in ₹ Crore or ₹ Lakh, or plain points. A website in Hindi and Marathi. Works on one laptop with a weak network. Built around how box cricket, kabaddi and football leagues really run their auctions.</p>
+          <div class="sports">
+            <a class="sport" href="/corporate-cricket-auction/"><b>Corporate leagues</b><span>office cricket auction</span></a>
+            <a class="sport" href="/school-college-sports-auction/"><b>Schools and colleges</b><span>sports festival auction</span></a>
+            <a class="sport" href="/society-and-village-league-auction/"><b>Society and village leagues</b><span>gully and local tournaments</span></a>
+            <a class="sport" href="/excel-vs-player-auction-software/"><b>Excel vs software</b><span>why organisers switch</span></a>
+          </div>
+        </div>
+      </section>
+` : ''}      <section class="sec sec-tint">
         <div class="wrap narrow">
           <h2 class="sec-title">${T.faqTitle}</h2>
           ${faqHtml(FAQ)}
@@ -592,6 +607,7 @@ export function allPages() {
     pricingPage,
     faqPage,
     contactPage(),
+    ...extraPages({ pageHead, ctaBand, faqSchema, crumbs, features, faqHtml, screenMock }),
     privacyPage,
     termsPage,
     notFound,
