@@ -4,3 +4,8 @@ dist-embed
 *.local
 .env
 .env.*
+
+# Database password lives only on the server
+server/api/config.php
+dist-hostinger
+dist-hostinger.zip

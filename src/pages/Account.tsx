@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react';
+import { GoogleButton, UserAvatar } from '../components/GoogleSignIn';
 import { Toast, useToast } from '../components/ui';
+import { signOut, useAuth } from '../store/auth';
 import { exportAccount, importAccount, updateIndex, uploadLocalAuctions, useCloudInfo, useIndex, type AccountBackup } from '../store/store';
 import type { Organizer } from '../types';
 
@@ -9,6 +11,7 @@ export function Account() {
   const [toast, showToast] = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const cloud = useCloudInfo();
+  const auth = useAuth();
   const localOnly = auctions.filter((a) => !cloud.synced.includes(a.id)).length;
   const plural = (n: number) => `${n} auction${n === 1 ? '' : 's'}`;
 
@@ -66,6 +69,32 @@ export function Account() {
         <div className="row"><button className="btn btn-primary" type="submit">Save profile</button></div>
       </form>
 
+      {auth.enabled && (
+        <section className="card">
+          <h2>Google account</h2>
+          {auth.user ? (
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <span className="row" style={{ flexWrap: 'nowrap', minWidth: 0 }}>
+                <UserAvatar user={auth.user} size={44} />
+                <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                  <strong>{auth.user.name || auth.user.email}</strong>
+                  <span className="muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{auth.user.email}</span>
+                </span>
+              </span>
+              <button className="btn" disabled={auth.busy} onClick={() => void signOut()}>Sign out</button>
+            </div>
+          ) : (
+            <>
+              <p className="hint" style={{ fontSize: 14 }}>
+                Sign in to save your auctions online. They are then linked to your Google account, so you can open them on any laptop or phone.
+                Without signing in, the app still works, but auctions stay in this browser only.
+              </p>
+              <GoogleButton />
+            </>
+          )}
+        </section>
+      )}
+
       <section className="card">
         <h2>Plan</h2>
         <div className="row">
@@ -91,10 +120,10 @@ export function Account() {
             </div>
             {cloud.status.kind === 'error' && <div className="banner banner-cream">{cloud.status.message} Your auctions are still safe in this browser.</div>}
             <p className="hint" style={{ fontSize: 14 }}>
-              Auctions in the cloud can be watched on any device that has the link, for example the Live screen on a projector laptop.
-              Only this browser can change them, because there is no login yet: keep downloading a backup, and do not clear this browser’s data.
+              Auctions in the cloud can be watched on any device that has the link, for example the Live screen on a projector laptop or a phone.
+              {auth.user ? ' Only your Google account can change them, from any device you sign in on.' : ' Sign in with Google (above) to save them online.'}
             </p>
-            {localOnly > 0 && (
+            {localOnly > 0 && auth.user && (
               <div className="row">
                 <button className="btn btn-primary" onClick={upload}>Upload {plural(localOnly)} to the cloud</button>
               </div>

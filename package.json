@@ -10,10 +10,10 @@
     "build:embed": "node scripts/build-embed.mjs",
     "preview": "vite preview --host",
     "test": "vitest run",
-    "deploy": "npm run build && npx firebase-tools deploy"
+    "build:hostinger": "node scripts/build-hostinger.mjs",
+    "test:api": "node scripts/test-api.mjs http://127.0.0.1:8099/api"
   },
   "dependencies": {
-    "firebase": "^13.2.0",
     "lucide-react": "^1.48.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

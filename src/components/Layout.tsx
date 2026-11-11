@@ -3,7 +3,9 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { APP_NAME, APP_TAGLINE } from '../brand';
 import { sportOf } from '../data/sports';
+import { useAuth } from '../store/auth';
 import { useAppState, useAuctionStatus, useCloudInfo } from '../store/store';
+import { UserChip } from './GoogleSignIn';
 import { useAuctionPath } from './AuctionRoute';
 import { ScreenLink } from './ScreenLink';
 
@@ -22,7 +24,10 @@ function Shell({ sidebar, title }: { sidebar: ReactNode; title: string }) {
           </span>
         </Link>
         {sidebar}
-        <div className="sidebar-foot"><CloudLine /></div>
+        <div className="sidebar-foot" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <UserChip />
+          <CloudLine />
+        </div>
       </aside>
       <div className="scrim" onClick={() => setOpen(false)} />
       <div className="main">
@@ -41,7 +46,9 @@ function Shell({ sidebar, title }: { sidebar: ReactNode; title: string }) {
 /** One line at the bottom of the menu saying where the data is being saved. */
 function CloudLine() {
   const { enabled, status } = useCloudInfo();
+  const { user, checked } = useAuth();
   if (!enabled) return <>Saved on this device only</>;
+  if (checked && !user) return <Link to="/account" style={{ color: '#ffb27a' }}>Sign in with Google to save online</Link>;
   if (status.kind === 'error') return <Link to="/account" style={{ color: '#ff8f84' }}>Cloud sync problem · see Account</Link>;
   return <>{status.kind === 'on' ? 'Cloud sync on' : 'Connecting to cloud…'}</>;
 }

@@ -11,7 +11,7 @@ export interface Sport {
 }
 
 export const SPORTS: Sport[] = [
-  { id: 'cricket', name: 'Cricket', roles: ['Batsman', 'Bowler', 'All-rounder', 'Wicket-keeper'], hasBatBowl: true },
+  { id: 'cricket', name: 'Cricket', roles: ['Batsman', 'Bowler', 'All-rounder', 'Wicket-keeper', 'Fielder'], hasBatBowl: true },
   { id: 'football', name: 'Football', roles: ['Goalkeeper', 'Defender', 'Midfielder', 'Forward'], hasBatBowl: false },
   { id: 'kabaddi', name: 'Kabaddi', roles: ['Raider', 'Defender', 'All-rounder'], hasBatBowl: false },
   { id: 'volleyball', name: 'Volleyball', roles: ['Setter', 'Attacker', 'Blocker', 'Libero', 'All-rounder'], hasBatBowl: false },

@@ -1,11 +1,13 @@
 import { CalendarDays, CheckCircle2, Copy, Gavel, LayoutGrid, MapPin, MonitorPlay, Plus, Radio, Search, Settings2, Sparkles, Trash2, Trophy, Users } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { GoogleButton } from '../components/GoogleSignIn';
 import { ScreenLink } from '../components/ScreenLink';
 import { Drawer, EmptyState, Segmented, StatCard } from '../components/ui';
 import { APP_NAME } from '../brand';
 import { createBlankState, createDummyState } from '../data/dummy';
 import { SPORTS, sportOf, type SportId } from '../data/sports';
+import { useAuth } from '../store/auth';
 import { createAuction, deleteAuction, duplicateAuction, useIndex } from '../store/store';
 import type { AuctionMeta, Unit } from '../types';
 
@@ -36,6 +38,7 @@ export function Home() {
   const setCreating = (open: boolean) => setParams(open ? { new: '1' } : {}, { replace: true });
   const [filter, setFilter] = useState<Filter>('all');
   const [q, setQ] = useState('');
+  const auth = useAuth();
 
   const isLive = (a: AuctionMeta) => a.status === 'live' || a.status === 'paused';
   const matches = (a: AuctionMeta) =>
@@ -61,6 +64,16 @@ export function Home() {
           <button className="btn btn-accent btn-lg" onClick={() => setCreating(true)}><Plus size={18} />New auction</button>
         </div>
       </section>
+
+      {auth.enabled && auth.checked && !auth.user && (
+        <div className="card" style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+          <span style={{ flex: '1 1 260px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <strong>Save your auctions online</strong>
+            <span className="hint" style={{ fontSize: 13.5 }}>Sign in with Google to keep auctions safe in your account and open them on any laptop or phone. Without it, they stay in this browser only.</span>
+          </span>
+          <GoogleButton width={260} />
+        </div>
+      )}
 
       {liveNow.length > 0 && (
         <div className="banner banner-red">

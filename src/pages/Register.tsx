@@ -1,59 +1,86 @@
+import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { uid } from '../lib/format';
 import { resizeImage } from '../lib/media';
-import { update, useAppState } from '../store/store';
+import { TSHIRT_SIZES } from '../lib/registration';
+import { submitRegistration, useAppState, type RegistrationResult } from '../store/store';
 import { sportOf } from '../data/sports';
-import type { Role } from '../types';
+import type { ExtraTshirt, Role } from '../types';
 
 const BOWLING = ['Right-arm fast', 'Right-arm medium', 'Off spin', 'Leg spin', 'Left-arm fast', 'Left-arm spin', 'Does not bowl'];
-const SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
+const OTHER = 'Other';
+
+/** A size being chosen: one of the standard sizes, or "Other" with the size typed in. */
+interface SizeChoice { pick: string; custom: string }
+const sizeOf = (s: SizeChoice) => (s.pick === OTHER ? s.custom.trim() : s.pick);
+
+interface ExtraRow { key: number; who: ExtraTshirt['who']; name: string; size: SizeChoice; jerseyName: string; jerseyNo: string }
+
+const PROBLEMS: Record<Exclude<RegistrationResult, 'ok'>, string> = {
+  already_registered: 'This mobile number is already registered.',
+  closed: 'Registration is closed.',
+  offline: 'No internet right now. Please check your connection and submit again.',
+  failed: 'Could not send the form. Please try again in a minute.',
+};
+
+const blank = { name: '', age: '', mobile: '', role: '' as Role | '', batting: 'Right hand', bowling: BOWLING[0]!, jerseyName: '', jerseyNo: '', photo: '' };
 
 /** Public form players fill themselves. New entries stay "on hold" until the organiser reviews them. */
 export function Register() {
-  const { settings, players, categories } = useAppState();
+  const { settings } = useAppState();
   const sport = sportOf(settings.sport);
-  const ROLES = sport.roles;
-  const [form, setForm] = useState({ name: '', age: '', mobile: '', role: '' as Role | '', batting: 'Right hand', bowling: BOWLING[0]!, jerseyName: '', jerseyNo: '', tshirt: 'M', photo: '' });
+  const [form, setForm] = useState(blank);
+  const [tshirt, setTshirt] = useState<SizeChoice>({ pick: 'M', custom: '' });
+  const [extras, setExtras] = useState<ExtraRow[]>([]);
   const [error, setError] = useState('');
-  const [done, setDone] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [done, setDone] = useState('');
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const setExtra = (key: number, patch: Partial<ExtraRow>) => setExtras((list) => list.map((x) => (x.key === key ? { ...x, ...patch } : x)));
+  const addExtra = (who: ExtraTshirt['who']) =>
+    setExtras((list) => [...list, { key: Date.now() + list.length, who, name: '', size: { pick: 'M', custom: '' }, jerseyName: '', jerseyNo: '' }]);
 
   if (!settings.selfRegistration) {
     return <div className="phone"><div className="empty">Registration is closed.</div></div>;
   }
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (sending) return;
     if (!form.name.trim()) return setError('Please enter your full name.');
     if (!/^\d{10}$/.test(form.mobile.replace(/\D/g, ''))) return setError('Please enter a 10-digit mobile number.');
     if (!form.role) return setError('Please choose your playing role.');
-    if (players.some((p) => p.mobile && p.mobile.replace(/\D/g, '') === form.mobile.replace(/\D/g, ''))) {
-      return setError('This mobile number is already registered.');
+    if (!sizeOf(tshirt)) return setError('Please type your T-shirt size.');
+    for (const [i, x] of extras.entries()) {
+      if (x.who === 'other' && !x.name.trim()) return setError(`Extra T-shirt ${i + 1}: please enter the person's name.`);
+      if (!sizeOf(x.size)) return setError(`Extra T-shirt ${i + 1}: please type the size.`);
     }
-    update((s) =>
-      void s.players.push({
-        id: uid('p'),
-        no: Math.max(100, ...s.players.map((p) => p.no)) + 1,
-        name: form.name.trim(),
-        age: form.age ? Number(form.age) : undefined,
-        mobile: form.mobile.replace(/\D/g, ''),
-        role: form.role as Role,
-        batting: sport.hasBatBowl ? form.batting : '',
-        bowling: !sport.hasBatBowl ? '' : form.bowling === 'Does not bowl' ? '—' : form.bowling,
-        categoryId: categories[categories.length - 1]!.id,
-        tag: '',
-        jerseyName: form.jerseyName,
-        jerseyNo: form.jerseyNo,
-        tshirt: form.tshirt,
-        photo: form.photo || undefined,
-        status: 'hold',
-        teamId: null,
-        price: null,
-        previousTeamId: null,
-        selfRegistered: true,
-      }),
-    );
-    setDone(true);
+    setError('');
+    setSending(true);
+    const result = await submitRegistration({
+      name: form.name.trim(),
+      age: form.age ? Number(form.age) : undefined,
+      mobile: form.mobile.replace(/\D/g, ''),
+      role: form.role,
+      batting: sport.hasBatBowl ? form.batting : '',
+      bowling: !sport.hasBatBowl ? '' : form.bowling === 'Does not bowl' ? '—' : form.bowling,
+      jerseyName: form.jerseyName,
+      jerseyNo: form.jerseyNo,
+      tshirt: sizeOf(tshirt),
+      extraTshirts: extras.map((x) => ({
+        who: x.who,
+        name: x.who === 'other' ? x.name.trim() : '',
+        size: sizeOf(x.size),
+        jerseyName: x.jerseyName.trim(),
+        jerseyNo: x.jerseyNo,
+      })),
+      photo: form.photo || undefined,
+    });
+    setSending(false);
+    if (result !== 'ok') return setError(PROBLEMS[result]);
+    setDone(form.name.trim());
+    setForm(blank);
+    setTshirt({ pick: 'M', custom: '' });
+    setExtras([]);
   };
 
   return (
@@ -69,9 +96,9 @@ export function Register() {
 
       {done ? (
         <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div className="banner banner-green" style={{ fontSize: 16 }}><strong>Thank you, {form.name}!</strong> You are registered.</div>
+          <div className="banner banner-green" style={{ fontSize: 16 }}><strong>Thank you, {done}!</strong> You are registered.</div>
           <p className="muted" style={{ margin: 0 }}>The organiser will review your details and assign your category before auction day.</p>
-          <button className="btn" onClick={() => { setDone(false); setForm((f) => ({ ...f, name: '', mobile: '', age: '', photo: '', jerseyName: '', jerseyNo: '' })); }}>Register another player</button>
+          <button className="btn" onClick={() => setDone('')}>Register another player</button>
         </div>
       ) : (
         <form onSubmit={submit} style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -86,13 +113,13 @@ export function Register() {
           </div>
           <label className="field">Full name *<input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="As it should appear on screen" autoComplete="name" /></label>
           <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: 12 }}>
-            <label className="field">Age<input className="input" inputMode="numeric" value={form.age} onChange={(e) => set('age', e.target.value.replace(/\D/g, ''))} /></label>
+            <label className="field">Age<input className="input" inputMode="numeric" maxLength={2} value={form.age} onChange={(e) => set('age', e.target.value.replace(/\D/g, ''))} /></label>
             <label className="field">Mobile *<input className="input" type="tel" value={form.mobile} onChange={(e) => set('mobile', e.target.value)} placeholder="10-digit number" autoComplete="tel" /></label>
           </div>
           <div className="field">
             Playing role *
             <div className="choice-grid" role="group" aria-label="Playing role">
-              {ROLES.map((r) => (
+              {sport.roles.map((r) => (
                 <button key={r} type="button" className="choice" aria-pressed={form.role === r} onClick={() => set('role', r)}>{r}</button>
               ))}
             </div>
@@ -108,19 +135,66 @@ export function Register() {
             </div>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px', gap: 12 }}>
-            <label className="field">Jersey name<input className="input" value={form.jerseyName} onChange={(e) => set('jerseyName', e.target.value.toUpperCase())} /></label>
-            <label className="field">Number<input className="input" inputMode="numeric" value={form.jerseyNo} onChange={(e) => set('jerseyNo', e.target.value.replace(/\D/g, ''))} /></label>
+            <label className="field">Jersey name<input className="input" maxLength={24} value={form.jerseyName} onChange={(e) => set('jerseyName', e.target.value.toUpperCase())} /></label>
+            <label className="field">Number<input className="input" inputMode="numeric" maxLength={4} value={form.jerseyNo} onChange={(e) => set('jerseyNo', e.target.value.replace(/\D/g, ''))} /></label>
           </div>
           <div className="field">
             T-shirt size
-            <div className="row" role="group" aria-label="T-shirt size" style={{ gap: 6, flexWrap: 'nowrap' }}>
-              {SIZES.map((s) => (
-                <button key={s} type="button" className="choice" style={{ flex: 1 }} aria-pressed={form.tshirt === s} onClick={() => set('tshirt', s)}>{s}</button>
+            <div className="row" role="group" aria-label="T-shirt size" style={{ gap: 6, flexWrap: 'wrap' }}>
+              {[...TSHIRT_SIZES, OTHER].map((s) => (
+                <button key={s} type="button" className="choice" style={{ flex: '1 0 auto' }} aria-pressed={tshirt.pick === s} onClick={() => setTshirt((t) => ({ ...t, pick: s }))}>{s}</button>
               ))}
             </div>
+            {tshirt.pick === OTHER && (
+              <input className="input" style={{ marginTop: 8 }} autoFocus maxLength={20} aria-label="Your T-shirt size" placeholder="Type your size, e.g. 3XL, 44 inch, Kids 30" value={tshirt.custom} onChange={(e) => setTshirt((t) => ({ ...t, custom: e.target.value }))} />
+            )}
           </div>
+
+          <div className="field" style={{ gap: 10 }}>
+            <span>
+              Extra T-shirts <span className="muted" style={{ fontWeight: 400 }}>(optional)</span>
+            </span>
+            <span className="hint" style={{ marginTop: -6 }}>Want one more for yourself, or one for family, friends or supporters who are not playing? Add them here.</span>
+            {extras.map((x, i) => (
+              <div key={x.key} style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12, borderRadius: 12, border: '1px solid var(--line)', background: 'var(--surface-2)' }}>
+                <div className="row" style={{ flexWrap: 'nowrap' }}>
+                  <strong style={{ fontSize: 14 }}>Extra T-shirt {i + 1}</strong>
+                  <span className="spacer" />
+                  <button type="button" className="btn btn-ghost btn-sm btn-icon" aria-label={`Remove extra T-shirt ${i + 1}`} onClick={() => setExtras((list) => list.filter((y) => y.key !== x.key))}><Trash2 size={15} /></button>
+                </div>
+                <div className="row" role="group" aria-label="Who is it for" style={{ gap: 6, flexWrap: 'nowrap' }}>
+                  <button type="button" className="choice" style={{ flex: 1 }} aria-pressed={x.who === 'player'} onClick={() => setExtra(x.key, { who: 'player' })}>For me</button>
+                  <button type="button" className="choice" style={{ flex: 1 }} aria-pressed={x.who === 'other'} onClick={() => setExtra(x.key, { who: 'other' })}>Non-player</button>
+                </div>
+                {x.who === 'other' && (
+                  <label className="field">Person's name *<input className="input" maxLength={80} value={x.name} onChange={(e) => setExtra(x.key, { name: e.target.value })} placeholder="Who is this T-shirt for?" /></label>
+                )}
+                <div style={{ display: 'grid', gridTemplateColumns: x.size.pick === OTHER ? '110px 1fr' : '1fr', gap: 12 }}>
+                  <label className="field">Size
+                    <select className="select" value={x.size.pick} onChange={(e) => setExtra(x.key, { size: { ...x.size, pick: e.target.value } })}>
+                      {[...TSHIRT_SIZES, OTHER].map((s) => <option key={s}>{s}</option>)}
+                    </select>
+                  </label>
+                  {x.size.pick === OTHER && (
+                    <label className="field">Type the size *<input className="input" maxLength={20} placeholder="e.g. 3XL, Kids 30" value={x.size.custom} onChange={(e) => setExtra(x.key, { size: { ...x.size, custom: e.target.value } })} /></label>
+                  )}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px', gap: 12 }}>
+                  <label className="field">Name on shirt<input className="input" maxLength={24} placeholder={x.who === 'player' ? form.jerseyName || 'Same as mine' : ''} value={x.jerseyName} onChange={(e) => setExtra(x.key, { jerseyName: e.target.value.toUpperCase() })} /></label>
+                  <label className="field">Number<input className="input" inputMode="numeric" maxLength={4} placeholder={x.who === 'player' ? form.jerseyNo : ''} value={x.jerseyNo} onChange={(e) => setExtra(x.key, { jerseyNo: e.target.value.replace(/\D/g, '') })} /></label>
+                </div>
+              </div>
+            ))}
+            {extras.length < 20 && (
+              <div className="row" style={{ gap: 8 }}>
+                <button type="button" className="btn btn-sm" onClick={() => addExtra('player')}><Plus size={15} />Extra for me</button>
+                <button type="button" className="btn btn-sm" onClick={() => addExtra('other')}><Plus size={15} />For a non-player</button>
+              </div>
+            )}
+          </div>
+
           {error && <div className="banner banner-red" role="alert">{error}</div>}
-          <button className="btn btn-primary" type="submit" style={{ minHeight: 52, fontSize: 16 }}>Submit registration</button>
+          <button className="btn btn-primary" type="submit" disabled={sending} style={{ minHeight: 52, fontSize: 16 }}>{sending ? 'Sending…' : 'Submit registration'}</button>
           <p className="hint" style={{ textAlign: 'center' }}>The organiser will review and assign your category.</p>
         </form>
       )}

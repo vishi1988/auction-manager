@@ -1,6 +1,7 @@
 import { sportOf, type Sport } from '../data/sports';
 import type { AppState, Category, Player, Role, Tag } from '../types';
 import { uid } from './format';
+import { sizeCounts, tshirtRows } from './registration';
 import { teamStats } from './rules';
 
 export const TEMPLATE_COLUMNS = [
@@ -25,6 +26,7 @@ function toRole(value: string, sport: Sport): Role {
     if (v.includes('keep') || v === 'wk') return 'Wicket-keeper';
     if (v.includes('all') || v === 'ar') return 'All-rounder';
     if (v.includes('bowl')) return 'Bowler';
+    if (v.includes('field')) return 'Fielder';
     return 'Batsman';
   }
   return (
@@ -119,6 +121,16 @@ export async function downloadTemplate(sport: Sport) {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Players');
   XLSX.writeFile(wb, 'players-template.xlsx');
+}
+
+/** The T-shirt order: one row per shirt (players' own and extras), plus a count per size. */
+export async function exportTshirts(state: AppState) {
+  const XLSX = await loadXlsx();
+  const rows = tshirtRows(state);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'T-shirts');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sizeCounts(rows)), 'Size count');
+  XLSX.writeFile(wb, state.settings.name.replace(/[^\w ]+/g, '') + ' - t-shirts.xlsx');
 }
 
 export async function exportResults(state: AppState) {

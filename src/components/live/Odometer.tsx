@@ -1,12 +1,24 @@
+import { useEffect, useRef, useState } from 'react';
+
 /**
- * Scoreboard-style number: each digit rolls to its new value.
- * Digits are keyed from the right, so ₹9.90 -> ₹10.00 rolls the existing
- * digits and only adds one on the left.
+ * Scoreboard-style number: each digit rolls to its new value, with a slight
+ * motion blur while it moves. Digits are keyed from the right, so
+ * ₹9.90 -> ₹10.00 rolls the existing digits and only adds one on the left.
  */
 export function Odometer({ text, className = '' }: { text: string; className?: string }) {
   const chars = [...text];
+  const prev = useRef(text);
+  const [rolling, setRolling] = useState(false);
+  useEffect(() => {
+    if (prev.current === text) return;
+    prev.current = text;
+    setRolling(true);
+    const id = setTimeout(() => setRolling(false), 650);
+    return () => clearTimeout(id);
+  }, [text]);
+
   return (
-    <span className={'odo ' + className} aria-label={text} role="text">
+    <span className={'odo' + (rolling ? ' rolling' : '') + (className ? ' ' + className : '')} aria-label={text} role="text">
       {chars.map((c, i) => {
         const key = chars.length - i;
         if (!/\d/.test(c)) {

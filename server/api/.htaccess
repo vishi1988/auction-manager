@@ -1,0 +1,5 @@
+# The settings file and shared helpers are never served directly.
+<FilesMatch "^(config|config\.sample|_lib)\.php$">
+  Require all denied
+</FilesMatch>
+Options -Indexes

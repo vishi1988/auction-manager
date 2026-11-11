@@ -321,8 +321,8 @@ export function Settings() {
                 <label className="field">
                   Sold effect
                   <select className="select" value={settings.soldEffect} onChange={(e) => set('soldEffect', e.target.value as SettingsT['soldEffect'])}>
-                    <option value="fireworks">Fireworks</option>
-                    <option value="confetti">Confetti</option>
+                    <option value="fireworks">Gold sparks</option>
+                    <option value="confetti">Foil confetti</option>
                     <option value="stamp">SOLD stamp only</option>
                     <option value="none">None (no full-screen SOLD)</option>
                   </select>

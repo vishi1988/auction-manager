@@ -1,15 +1,16 @@
-import { AlertTriangle, Camera, ClipboardList, FileSpreadsheet, Info, Link2, MoreHorizontal, Pencil, Plus, Search, Trash2, Upload, UserPlus } from 'lucide-react';
+import { AlertTriangle, Camera, ClipboardList, FileSpreadsheet, Info, Link2, MoreHorizontal, Pencil, Plus, Search, Shirt, Trash2, Upload, UserPlus } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { useAuctionPath } from '../components/AuctionRoute';
 import { ScreenLink, shareUrl } from '../components/ScreenLink';
 import { Drawer, EmptyState, PlayerAvatar, Toast, copyText, useToast } from '../components/ui';
 import { sportOf } from '../data/sports';
-import { downloadTemplate, readPlayersFile, templateColumns } from '../lib/excel';
+import { downloadTemplate, exportTshirts, readPlayersFile, templateColumns } from '../lib/excel';
 import { money, uid } from '../lib/format';
 import { resizeImage } from '../lib/media';
+import { TSHIRT_SIZES, extrasSummary, tshirtRows } from '../lib/registration';
 import { basePriceOf } from '../lib/rules';
 import { update, useAppState } from '../store/store';
-import type { Player, PlayerStatus, Role, Tag } from '../types';
+import type { ExtraTshirt, Player, PlayerStatus, Role, Tag } from '../types';
 
 const TAGS: Tag[] = ['', 'Owner', 'Captain', 'Vice Captain', 'Icon'];
 const PAGE = 25;
@@ -103,6 +104,8 @@ export function Players() {
   const copyRegistration = () => copyText(shareUrl(path('/register')), showToast, 'Registration link copied');
   const closeMenu = (e: React.MouseEvent) => (e.currentTarget.closest('details') as HTMLDetailsElement | null)?.removeAttribute('open');
   const onHold = players.filter((p) => p.status === 'hold').length;
+  const shirts = useMemo(() => tshirtRows(state), [state]);
+  const extraShirts = shirts.filter((r) => r.Type !== 'Player').length;
 
   return (
     <main className="page">
@@ -113,6 +116,7 @@ export function Players() {
           <p>
             {players.length} players · {players.filter((p) => p.status === 'retained').length} retained ·{' '}
             {players.filter((p) => p.status === 'available').length} ready for auction
+            {shirts.length > 0 && <> · {shirts.length} T-shirts{extraShirts > 0 && ` (${extraShirts} extra)`}</>}
           </p>
         </div>
         <div className="row">
@@ -122,6 +126,7 @@ export function Players() {
               <button onClick={(e) => { closeMenu(e); downloadTemplate(sport); }}><FileSpreadsheet size={16} />Download Excel template</button>
               <button onClick={(e) => { closeMenu(e); copyRegistration(); }}><Link2 size={16} />Copy registration form link</button>
               <ScreenLink to={path('/register')}><ClipboardList size={16} />Open registration form ↗</ScreenLink>
+              <button disabled={!shirts.length} onClick={(e) => { closeMenu(e); void exportTshirts(state); }}><Shirt size={16} />Download T-shirt list (Excel)</button>
             </div>
           </details>
           <button className="btn" onClick={() => fileRef.current?.click()} title={'Columns: ' + templateColumns(sport).join(', ')}><Upload size={16} />Import Excel</button>
@@ -212,7 +217,7 @@ export function Players() {
         <table className="table">
           <thead>
             <tr>
-              <th>No.</th><th /><th>Name</th><th>Role</th>{sport.hasBatBowl && <><th>Bat</th><th>Bowling</th></>}<th>Category</th><th>Base</th><th>Status</th><th />
+              <th>No.</th><th /><th>Name</th><th>Role</th>{sport.hasBatBowl && <><th>Bat</th><th>Bowling</th></>}<th>Category</th><th>T-shirt</th><th>Base</th><th>Status</th><th />
             </tr>
           </thead>
           <tbody>
@@ -237,6 +242,10 @@ export function Players() {
                     </>
                   )}
                   <td><span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}><span className="swatch" style={{ background: c?.color }} />{c?.name}</span></td>
+                  <td>
+                    {p.tshirt || <span className="muted">—</span>}
+                    {!!p.extraTshirts?.length && <span className="pill pill-cream" style={{ fontSize: 11, padding: '2px 8px', marginLeft: 6 }} title={extrasSummary(p.extraTshirts)}>+{p.extraTshirts.length} extra</span>}
+                  </td>
                   <td className="num"><strong>{money(basePriceOf(state, p), settings.unit)}</strong></td>
                   <td>
                     <span className={statusPill[p.status]}>
@@ -327,8 +336,8 @@ function PlayerEditor({ player, onSave, onDelete, onClose }: { player: Player; o
           <label className="field">Own base price<input className="input" type="number" step={0.05} placeholder="Category base" value={p.basePrice ?? ''} onChange={(e) => set('basePrice', e.target.value ? Number(e.target.value) : null)} /></label>
           <label className="field">Jersey name<input className="input" value={p.jerseyName ?? ''} onChange={(e) => set('jerseyName', e.target.value)} /></label>
           <label className="field">Jersey no.<input className="input" value={p.jerseyNo ?? ''} onChange={(e) => set('jerseyNo', e.target.value)} /></label>
-          <label className="field">T-shirt
-            <select className="select" value={p.tshirt ?? ''} onChange={(e) => set('tshirt', e.target.value)}>{['', 'S', 'M', 'L', 'XL', 'XXL'].map((s) => <option key={s} value={s}>{s || '—'}</option>)}</select>
+          <label className="field">T-shirt size
+            <input className="input" list="tshirt-sizes" maxLength={20} placeholder="S, M, L… or type any size" value={p.tshirt ?? ''} onChange={(e) => set('tshirt', e.target.value)} />
           </label>
           <label className="field">Last season team (RTM)
             <select className="select" value={p.previousTeamId ?? ''} onChange={(e) => set('previousTeamId', e.target.value || null)}>
@@ -337,6 +346,8 @@ function PlayerEditor({ player, onSave, onDelete, onClose }: { player: Player; o
             </select>
           </label>
         </div>
+        <datalist id="tshirt-sizes">{TSHIRT_SIZES.map((s) => <option key={s} value={s} />)}</datalist>
+        <ExtraTshirts list={p.extraTshirts ?? []} onChange={(list) => set('extraTshirts', list.length ? list : undefined)} />
         {!locked && (
           <label className="row" style={{ fontSize: 14 }}>
             <input type="checkbox" checked={p.status === 'hold'} onChange={(e) => set('status', e.target.checked ? 'hold' : 'available')} />
@@ -345,5 +356,31 @@ function PlayerEditor({ player, onSave, onDelete, onClose }: { player: Player; o
         )}
         {locked && <p className="hint">This player is {p.status}. Undo the sale in the console, or release the retention on the Teams page, to change status.</p>}
     </Drawer>
+  );
+}
+
+/** The extra T-shirts a player ordered: a second one for themselves, or ones for people who are not playing. */
+function ExtraTshirts({ list, onChange }: { list: ExtraTshirt[]; onChange: (list: ExtraTshirt[]) => void }) {
+  const patch = (i: number, p: Partial<ExtraTshirt>) => onChange(list.map((x, j) => (j === i ? { ...x, ...p } : x)));
+  return (
+    <div className="field" style={{ gap: 8 }}>
+      Extra T-shirts
+      {list.map((x, i) => (
+        <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: 10, borderRadius: 10, background: 'var(--surface-2)' }}>
+          <select className="select" aria-label="Who it is for" value={x.who} onChange={(e) => patch(i, { who: e.target.value as ExtraTshirt['who'] })}>
+            <option value="player">For the player</option>
+            <option value="other">Non-player</option>
+          </select>
+          <input className="input" list="tshirt-sizes" maxLength={20} aria-label="Size" placeholder="Size" value={x.size} onChange={(e) => patch(i, { size: e.target.value })} />
+          {x.who === 'other' && <input className="input" style={{ gridColumn: '1 / -1' }} maxLength={80} aria-label="Person's name" placeholder="Person's name" value={x.name ?? ''} onChange={(e) => patch(i, { name: e.target.value })} />}
+          <input className="input" maxLength={24} aria-label="Name on shirt" placeholder="Name on shirt" value={x.jerseyName ?? ''} onChange={(e) => patch(i, { jerseyName: e.target.value })} />
+          <span className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
+            <input className="input" maxLength={4} aria-label="Number on shirt" placeholder="No." value={x.jerseyNo ?? ''} onChange={(e) => patch(i, { jerseyNo: e.target.value })} />
+            <button type="button" className="btn btn-ghost btn-sm btn-icon" aria-label="Remove this extra T-shirt" title="Remove" onClick={() => onChange(list.filter((_, j) => j !== i))}><Trash2 size={15} /></button>
+          </span>
+        </div>
+      ))}
+      <button type="button" className="btn btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => onChange([...list, { who: 'player', size: 'M' }])}><Plus size={15} />Add extra T-shirt</button>
+    </div>
   );
 }

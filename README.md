@@ -1,8 +1,9 @@
-# Auction Manager
+# KhiladiAuction
 
 Player auctions for local tournaments — cricket, football, kabaddi, volleyball and more.
-Set up teams and players, run the bidding from a laptop or phone, and show every SOLD
-moment on a projector.
+Set up teams and players, run the bidding from a laptop, and show every SOLD moment on a
+projector. Live at khiladiauction.com: a public website for Google, the app at `/app/`,
+and a small PHP + MySQL API at `/api/` for cloud sync (Hostinger).
 
 ## Run it
 
@@ -17,10 +18,14 @@ Then open http://localhost:5173.
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Start the app for development |
-| `npm test` | Run the auction-rule tests |
+| `npm run dev` | Start the app for development (local mode, no cloud) |
+| `npm test` | Run the auction-rule and app tests |
 | `npm run typecheck` | Check types |
-| `npm run build` | Production build into `dist/` |
+| `npm run build:hostinger` | Build website + app + API into `dist-hostinger/` and `dist-hostinger.zip` |
+| `npm run test:api` | Check the PHP API against a running server (see below) |
+| `npm run build:embed` | Single-file preview for claude.ai |
+
+To put it on Hostinger, follow [HOSTINGER-SETUP.md](HOSTINGER-SETUP.md).
 
 ## Where things are
 
@@ -28,36 +33,32 @@ Then open http://localhost:5173.
 |---|---|
 | `src/lib/rules.ts` | Money rules: increments, max bid, reserve purse check, upper limit, RTM, lucky draw entry |
 | `src/lib/auction.ts` | Auction flow: next player, bid, sold/unsold, lucky draw, undo, rounds |
-| `src/lib/rules.test.ts` | Tests for the two files above |
-| `src/store/` | Saving data and syncing screens (browser storage now; cloud later) |
-| `src/pages/` | One file per screen |
-| `src/data/` | Demo data and the list of sports |
-| `src/brand.ts` | Product name — change it here |
-| `src/firebase/config.ts` | Firebase project keys — empty means local mode |
-| `firestore.rules` | Who may read and write auctions in the cloud |
-| `firebase.json` | Hosting and rules settings for `npm run deploy` |
+| `src/store/` | Saving data: browser storage, plus cloud sync through the PHP API (`cloud.ts`) |
+| `src/pages/` | One file per app screen |
+| `src/brand.ts` | Product name |
+| `server/api/` | PHP API: `auction.php`, `photos.php`, `ping.php`; `config.sample.php` for the database |
+| `site/` | Website pages (`content.mjs`), layout and SEO tags (`layout.mjs`), styles, settings (`config.mjs`) |
+| `scripts/build-hostinger.mjs` | Builds everything, plus `sitemap.xml`, `robots.txt` and `.htaccess` |
 
 ## Where data is saved
 
-**Local mode (default).** Data is saved in the browser on this computer. Use
-**Account → Download backup** before clearing browser data or moving to another computer.
+**Local build (`npm run dev`).** Everything stays in the browser on this computer.
 
-**Cloud sync (optional).** When the keys in `src/firebase/config.ts` are filled in, auctions
-are also saved in Firebase. There is no login: each browser gets a silent anonymous identity.
+**Website build (`/app/` on Hostinger).** The browser is still the working copy, so the auction
+keeps running without internet. Online auctions are also saved in MySQL through the API.
 
-- The browser that created an auction is the only one that can change it.
-- Any device that has the auction's link can watch it (for example the Live screen).
-- The auction keeps running without internet and catches up when it is back.
-- Clearing the organiser browser's data loses the right to change its cloud auctions, so
-  still download a backup.
+- No login: the browser that creates an auction holds its secret owner token; only it can change the auction.
+- Anyone with an auction's link can watch it (the Live screen on a projector or phone). Phone numbers are removed for viewers.
+- **Account → Download backup** includes the owner tokens: restoring it on another computer moves the right to run those auctions there.
 
-### Turning cloud sync on
+## Testing the API locally
 
-1. In the [Firebase console](https://console.firebase.google.com) create a project (free Spark plan).
-2. **Build → Authentication → Get started → Sign-in method → Anonymous → Enable.**
-3. **Build → Firestore Database → Create database** (production mode, region `asia-south1`).
-4. **Project settings → Your apps → Web (`</>`)**, register an app, and copy the `firebaseConfig`
-   values into `src/firebase/config.ts`.
-5. In a terminal: `npx firebase-tools login`, then `npx firebase-tools use --add` and pick the project.
-6. `npm run deploy` publishes the security rules and puts the app on `https://<project>.web.app`.
-7. In the app, **Account → Upload auctions to the cloud** moves existing auctions over.
+With PHP 8.2+ installed:
+
+```
+php -S 127.0.0.1:8099 -t server
+```
+
+Create `server/api/config.php` from `config.sample.php` (an SQLite DSN like
+`sqlite:C:/temp/test.db` works for testing), then run `npm run test:api`.
+For the app against that API: `npx vite --mode cloud` (it proxies `/api` to port 8099).

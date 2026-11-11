@@ -6,6 +6,18 @@
       "runtimeExecutable": "C:\\Users\\VISHAL\\AppData\\Local\\Programs\\nodejs\\node.exe",
       "runtimeArgs": ["node_modules/vite/bin/vite.js", "--host"],
       "port": 5173
+    },
+    {
+      "name": "auction-cloud",
+      "runtimeExecutable": "C:\\Users\\VISHAL\\AppData\\Local\\Programs\\nodejs\\node.exe",
+      "runtimeArgs": ["node_modules/vite/bin/vite.js", "--host", "--mode", "cloud", "--port", "5174", "--strictPort"],
+      "port": 5174
+    },
+    {
+      "name": "php-api",
+      "runtimeExecutable": "C:\\Users\\VISHAL\\AppData\\Local\\Temp\\claude\\cd31b463b21d6560\\1ea82afa-12b4-47ae-9d4d-751f9c56ab5b\\scratchpad\\php\\php.exe",
+      "runtimeArgs": ["-S", "127.0.0.1:8099", "-t", "server"],
+      "port": 8099
     }
   ]
 }

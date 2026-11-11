@@ -77,6 +77,33 @@ export interface Team {
   rtmUsed: number;
 }
 
+/** A T-shirt ordered on top of the player's own: a second one for the player, or one for someone who is not playing. */
+export interface ExtraTshirt {
+  who: 'player' | 'other';
+  /** Who it is for, when it is not for the player (family, friend, supporter). */
+  name?: string;
+  size: string;
+  jerseyName?: string;
+  jerseyNo?: string;
+}
+
+/** What a player sends from the registration form. */
+export interface Registration {
+  /** Given by the server; becomes the player's id. */
+  id?: string;
+  name: string;
+  age?: number;
+  mobile: string;
+  role: Role;
+  batting: string;
+  bowling: string;
+  jerseyName?: string;
+  jerseyNo?: string;
+  tshirt?: string;
+  extraTshirts?: ExtraTshirt[];
+  photo?: string;
+}
+
 export interface Player {
   id: string;
   no: number;
@@ -90,7 +117,9 @@ export interface Player {
   tag: Tag;
   jerseyName?: string;
   jerseyNo?: string;
+  /** Size: S–XXL, or whatever the player typed (e.g. "3XL", "Kids 30"). */
   tshirt?: string;
+  extraTshirts?: ExtraTshirt[];
   photo?: string;
   /** Overrides the category base price when set. */
   basePrice?: number | null;
