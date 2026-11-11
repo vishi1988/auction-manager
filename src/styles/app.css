@@ -323,44 +323,17 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .list-row:first-of-type { border-top: none; }
 
 /* =========================================================
-   Live dashboard (projector)
+   Live badge (also used outside the live screen) and owner phone pieces.
+   The live projector screen has its own file: live.css
    ========================================================= */
-.live { --bg: #0b1220; --panel: #131c2e; --panel-2: #1c2842; --line-d: #26334f; --fg: #f4f6fb; --fg-2: #d3dbe8; --fg-3: #93a3bb; --hi: #f5b324; --good: #6d93ff;
-  min-height: 100vh; background: var(--bg); color: var(--fg); padding: 24px 32px; display: flex; flex-direction: column; gap: 20px; overflow: hidden; font-family: var(--body); }
-.live[data-theme='gold'] { --bg: #120d05; --panel: #20170a; --panel-2: #2e2210; --line-d: #3d2e15; --good: #f5b324; --hi: #ffcf5c; }
-.live[data-theme='light'] { --bg: #f4f6fa; --panel: #ffffff; --panel-2: #eaf0ff; --line-d: #e2e8f0; --fg: #0e1726; --fg-2: #334155; --fg-3: #5b6b82; --hi: #c2410c; --good: #2e5bff; }
-.live-head { display: flex; align-items: center; gap: 16px; }
-.live-title { font: 700 32px var(--display); letter-spacing: 0.04em; flex-grow: 1; text-transform: uppercase; }
 .live-badge { display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; background: #ef4444; color: #fff; font-weight: 800; font-size: 13px; letter-spacing: 0.12em; }
 .live-badge .live-dot { background: #fff; }
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; animation: liveDot 1.2s ease-in-out infinite; display: inline-block; }
-.live-main { flex-grow: 1; display: grid; grid-template-columns: minmax(420px, 540px) minmax(0, 1fr); gap: 28px; min-height: 0; }
-.block { position: relative; background: var(--panel); border-radius: 18px; overflow: hidden; }
-.block-inner { padding: 28px; height: 100%; display: flex; flex-direction: column; gap: 20px; }
-.block-photo { width: 150px; height: 170px; flex-shrink: 0; border-radius: 14px; background: var(--panel-2); color: var(--good); display: flex; align-items: center; justify-content: center; font: 700 72px var(--display); overflow: hidden; }
+.block-photo { width: 150px; height: 170px; flex-shrink: 0; border-radius: 14px; background: #1c2842; color: #6d93ff; display: flex; align-items: center; justify-content: center; font: 700 72px var(--display); overflow: hidden; }
 .block-photo img { width: 100%; height: 100%; object-fit: cover; }
-.cap { font-size: 13px; font-weight: 700; letter-spacing: 0.14em; color: var(--fg-3); }
-.block-name { font: 700 56px/0.95 var(--display); }
-.block-bid { font: 700 120px/0.9 var(--display); color: var(--hi); transform-origin: left bottom; }
-.lead-banner { display: flex; align-items: center; gap: 14px; min-height: 80px; padding: 16px 18px; border-radius: 14px; color: #fff; }
-.lead-wait { border: 2px dashed var(--line-d); color: var(--fg-3); font-size: 18px; background: transparent; }
-.chip-float { position: absolute; right: -8px; top: 18px; padding: 4px 10px; border-radius: 999px; background: var(--hi); color: var(--bg); font-weight: 800; font-size: 15px; }
-.live-teams { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: 14px; }
-.live-team { border-radius: 16px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; background: var(--panel); }
-.live-team.hot { outline: 3px solid var(--hi); outline-offset: -3px; }
-.live-team .purse { font: 700 40px/1 var(--display); }
-.bar { height: 6px; border-radius: 3px; background: var(--line-d); overflow: hidden; }
+.cap { font-size: 13px; font-weight: 700; letter-spacing: 0.14em; color: #93a3bb; }
+.bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .bar > div { height: 100%; transition: width 0.8s ease 0.5s; }
-.overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-.overlay.dim { background: rgb(11 18 32 / 0.8); }
-.stamp { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px 44px 20px; border: 6px solid var(--hi); border-radius: 16px; color: var(--hi); background: var(--bg); transform: rotate(-8deg); }
-.stamp .word { font: 700 136px/0.9 var(--display); letter-spacing: 0.04em; }
-.stamp.grey { border-color: var(--fg-3); color: var(--fg-2); background: var(--panel); }
-.stamp.grey .word { font-size: 116px; }
-.rays { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
-.rays > span { position: absolute; left: 0; top: 0; }
-.rays > span > i { position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; border-radius: 50%; }
-.ticker { height: 56px; flex-shrink: 0; display: flex; align-items: center; gap: 28px; padding: 0 20px; border-radius: 14px; background: var(--panel); font-size: 15px; overflow: hidden; white-space: nowrap; }
 
 /* =========================================================
    Phone-first public pages (owner bidding, registration)
@@ -479,10 +452,4 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   .team-btn .meta, .team-btn .kbd, .hide-mobile { display: none; }
   .actions { position: sticky; bottom: 0; grid-template-columns: 2fr 1fr 1fr; background: var(--bg); padding: 10px 0; }
   .actions .skip { display: none; }
-  .live { padding: 16px; }
-  .live-main { grid-template-columns: minmax(0, 1fr); }
-  .live-teams { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .block-name { font-size: 40px; }
-  .block-bid { font-size: 80px; }
-  .live-title { font-size: 22px; }
 }

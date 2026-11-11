@@ -41,7 +41,8 @@ export interface Settings {
   timerStart: number;
   timerAfterBid: number;
   theme: 'stadium' | 'light' | 'gold';
-  soldEffect: 'burst' | 'stamp' | 'none';
+  /** What the live screen shows on SOLD. */
+  soldEffect: 'fireworks' | 'confetti' | 'stamp' | 'none';
   rtm: boolean;
   rtmCards: number;
   retention: boolean;

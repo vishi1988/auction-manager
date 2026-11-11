@@ -22,7 +22,7 @@ export const defaultSettings: Settings = {
   timerStart: 30,
   timerAfterBid: 15,
   theme: 'stadium',
-  soldEffect: 'burst',
+  soldEffect: 'fireworks',
   rtm: true,
   rtmCards: 1,
   retention: true,
@@ -182,11 +182,19 @@ export function createBlankState(settings: Partial<Settings>): AppState {
 
 /** Brings state saved by an older version of the app up to date. */
 export function migrateState(s: AppState): AppState {
+  // "Stamp + burst" became "Fireworks".
+  const oldEffect = (s.settings.soldEffect as string) === 'burst';
   // New settings get their defaults even on the same version.
-  if (s.version === STATE_VERSION && Object.keys(defaultSettings).every((k) => k in s.settings)) return s;
+  if (!oldEffect && s.version === STATE_VERSION && Object.keys(defaultSettings).every((k) => k in s.settings)) return s;
   return {
     ...s,
     version: STATE_VERSION,
-    settings: { ...structuredClone(defaultSettings), ...s.settings, sport: s.settings.sport ?? 'cricket', venue: s.settings.venue ?? '' },
+    settings: {
+      ...structuredClone(defaultSettings),
+      ...s.settings,
+      sport: s.settings.sport ?? 'cricket',
+      venue: s.settings.venue ?? '',
+      ...(oldEffect ? { soldEffect: 'fireworks' as const } : {}),
+    },
   };
 }
