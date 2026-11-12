@@ -40,7 +40,13 @@ CREATE TABLE IF NOT EXISTS users (
   name VARCHAR(200) NOT NULL DEFAULT '',
   picture VARCHAR(500) NOT NULL DEFAULT '',
   created_at BIGINT NOT NULL,
-  last_login_at BIGINT NOT NULL
+  last_login_at BIGINT NOT NULL,
+  -- Added later (the API adds them by itself): roles and plans, see admin.php.
+  is_admin TINYINT NOT NULL DEFAULT 0,
+  plan VARCHAR(10) NOT NULL DEFAULT 'free',
+  payment_done TINYINT NOT NULL DEFAULT 0,
+  suspended TINYINT NOT NULL DEFAULT 0,
+  pro_requested_at BIGINT NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS sessions (

@@ -9,6 +9,14 @@ require __DIR__ . '/_lib.php';
 
 $method = require_method('GET', 'POST');
 
+if ($method === 'POST' && ($_GET['action'] ?? '') === 'request_pro') {
+    // A free account asks the super admin for the Pro plan (more than 2 teams).
+    $u = require_user();
+    db()->prepare('UPDATE users SET pro_requested_at = ? WHERE id = ? AND pro_requested_at = 0')->execute([now_ms(), $u['id']]);
+    $u['pro_requested_at'] = (int)$u['pro_requested_at'] ?: now_ms();
+    ok(['user' => public_user($u)]);
+}
+
 if ($method === 'POST') {
     if (($_GET['action'] ?? '') !== 'logout') fail(400, 'bad_action');
     $token = $_COOKIE[SESSION_COOKIE] ?? '';

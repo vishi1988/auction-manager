@@ -1,6 +1,8 @@
 import { Pencil, Plus, Shield, Trash2, Users } from 'lucide-react';
 import { useState } from 'react';
+import { ProPrompt } from '../components/ProPrompt';
 import { Drawer, EmptyState, TeamBadge, Toast, useToast } from '../components/ui';
+import { teamLimitReached, useAuth } from '../store/auth';
 import { money, uid } from '../lib/format';
 import { resizeImage } from '../lib/media';
 import { teamStats } from '../lib/rules';
@@ -19,6 +21,10 @@ export function Teams() {
   const [draft, setDraft] = useState<Team | null>(null);
   const [toast, showToast] = useToast();
   const nextColor = SWATCHES[teams.length % SWATCHES.length]!;
+  const [proOpen, setProOpen] = useState(false);
+  useAuth(); // re-render when the plan changes
+  /** Free accounts can add up to 2 teams; the third shows the Pro prompt. */
+  const addTeam = () => (teamLimitReached(teams.length) ? setProOpen(true) : setDraft(blankTeam(nextColor)));
 
   const remove = (team: Team) => {
     if (teamStats(state, team.id).count > 0) return showToast('Remove this team’s players first');
@@ -34,7 +40,7 @@ export function Teams() {
           <h1>Teams</h1>
           <p>{teams.length} teams · {money(settings.purse, settings.unit)} purse each · {settings.minSquad}–{settings.maxSquad} players per team</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setDraft(blankTeam(nextColor))}><Plus size={16} />Add team</button>
+        <button className="btn btn-primary" onClick={addTeam}><Plus size={16} />Add team{teamLimitReached(teams.length) ? ' · Pro' : ''}</button>
       </div>
 
       {teams.length === 0 ? (
@@ -86,6 +92,7 @@ export function Teams() {
         </div>
       )}
 
+      {proOpen && <ProPrompt onClose={() => setProOpen(false)} />}
       {draft && <TeamDrawer draft={draft} onClose={() => setDraft(null)} showToast={showToast} />}
       <Toast msg={toast} />
     </main>

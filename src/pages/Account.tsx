@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import { GoogleButton, UserAvatar } from '../components/GoogleSignIn';
 import { Toast, useToast } from '../components/ui';
-import { signOut, useAuth } from '../store/auth';
+import { ProPrompt } from '../components/ProPrompt';
+import { FREE_MAX_TEAMS, signOut, useAuth } from '../store/auth';
 import { exportAccount, importAccount, updateIndex, uploadLocalAuctions, useCloudInfo, useIndex, type AccountBackup } from '../store/store';
 import type { Organizer } from '../types';
 
@@ -9,6 +10,7 @@ export function Account() {
   const { organizer, auctions } = useIndex();
   const [form, setForm] = useState<Organizer>(organizer);
   const [toast, showToast] = useToast();
+  const [proOpen, setProOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const cloud = useCloudInfo();
   const auth = useAuth();
@@ -97,11 +99,27 @@ export function Account() {
 
       <section className="card">
         <h2>Plan</h2>
-        <div className="row">
-          <span className="pill pill-green">Free</span>
-          <span>Unlimited auctions, teams and players.</span>
-        </div>
+        {!auth.enabled ? (
+          <div className="row"><span className="pill pill-green">Free</span><span>Unlimited auctions, teams and players on this device.</span></div>
+        ) : !auth.user ? (
+          <p className="hint" style={{ fontSize: 14 }}>Sign in with Google to see your plan.</p>
+        ) : auth.user.isAdmin ? (
+          <div className="row"><span className="pill pill-orange">Super admin</span><span>No team limit. You can approve accounts from the Super admin page.</span></div>
+        ) : auth.user.plan === 'pro' ? (
+          <div className="row"><span className="pill pill-green">Pro</span><span>No limit on teams or players.{auth.user.paymentDone ? '' : ' Payment not recorded yet.'}</span></div>
+        ) : (
+          <>
+            <div className="row"><span className="pill pill-grey">Free</span><span>Auctions with {FREE_MAX_TEAMS} teams and any number of players. Try the full auction at no cost.</span></div>
+            <div className="row">
+              {auth.user.proRequested
+                ? <span className="hint" style={{ fontSize: 14 }}>Pro requested. You will get access once it is approved; reload this page after that.</span>
+                : <button className="btn btn-primary" onClick={() => setProOpen(true)}>Get Pro (more than 2 teams)</button>}
+            </div>
+          </>
+        )}
+        {auth.user?.suspended && <div className="banner banner-cream">This account is suspended, so changes are not saved online. Contact KhiladiAuction.</div>}
       </section>
+      {proOpen && <ProPrompt onClose={() => setProOpen(false)} />}
 
       <section className="card">
         <h2>Your data</h2>

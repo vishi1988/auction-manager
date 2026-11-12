@@ -1,12 +1,14 @@
 import { ArrowRight, CalendarDays, Check, ClipboardList, Copy, Gavel, MapPin, MonitorPlay, Play, Settings2, Trophy, UserPlus, Users, UsersRound, Wallet } from 'lucide-react';
-import type { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, type ReactNode } from 'react';
+import { ProPrompt } from '../components/ProPrompt';
+import { Link, useParams } from 'react-router-dom';
+import { useAuth } from '../store/auth';
 import { useAuctionPath } from '../components/AuctionRoute';
 import { ScreenLink, shareUrl } from '../components/ScreenLink';
 import { StatCard, Toast, copyText, useToast } from '../components/ui';
 import { sportOf } from '../data/sports';
 import { money } from '../lib/format';
-import { useAppState } from '../store/store';
+import { goOnline, overFreeLimit, useAppState, useCloudInfo } from '../store/store';
 
 function formatDate(value: string) {
   if (!value) return 'Date not set';
@@ -19,6 +21,11 @@ export function Overview() {
   const state = useAppState();
   const { settings, teams, players, auction, log } = state;
   const path = useAuctionPath();
+  const { auctionId = '' } = useParams();
+  const cloud = useCloudInfo();
+  const auth = useAuth();
+  const online = cloud.synced.includes(auctionId);
+  const [proOpen, setProOpen] = useState(false);
   const [toast, showToast] = useToast();
 
   const needPlayers = teams.length * settings.minSquad;
@@ -130,6 +137,21 @@ export function Overview() {
         <section className="card">
           <h2>Share links</h2>
           <p className="hint">Send these on WhatsApp or open them on another screen.</p>
+          {cloud.enabled && !online && (
+            <div className="notice" role="alert" style={{ padding: '10px 12px', borderRadius: 10, background: '#fff4e0', color: '#7a4a00', fontSize: 13, display: 'grid', gap: 8 }}>
+              <span><strong>Not online yet.</strong> These links only work on this device, so other phones will see "Auction not found".</span>
+              {auth.user && overFreeLimit(state) ? (
+                <>
+                  <span>Free accounts can put an auction online with 2 teams. This one has {teams.length}: remove teams, or get Pro.</span>
+                  <button className="btn btn-sm btn-primary" style={{ justifySelf: 'start' }} onClick={() => setProOpen(true)}>Get Pro</button>
+                </>
+              ) : auth.user ? (
+                <button className="btn btn-sm btn-primary" style={{ justifySelf: 'start' }} onClick={() => (goOnline(auctionId) ? showToast('Going online… links will work in a few seconds') : showToast('Could not go online'))}>Make this auction online</button>
+              ) : (
+                <Link className="btn btn-sm btn-primary" style={{ justifySelf: 'start' }} to="/account">Sign in with Google first</Link>
+              )}
+            </div>
+          )}
           {links.map((l) => (
             <div key={l.path} className="row" style={{ flexWrap: 'nowrap', gap: 12, paddingTop: 12, borderTop: '1px solid var(--line-2)' }}>
               <span className={'stat-icon ' + l.tone} style={{ width: 38, height: 38 }}>{l.icon}</span>
@@ -148,6 +170,7 @@ export function Overview() {
           </Link>
         </section>
       </div>
+      {proOpen && <ProPrompt onClose={() => setProOpen(false)} />}
       <Toast msg={toast} />
     </main>
   );

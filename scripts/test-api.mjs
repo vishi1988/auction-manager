@@ -202,6 +202,45 @@ await check('only its account can delete; then it is gone', async () => {
   assert.equal((await call(`/photos.php?id=${id}`)).status, 404);
   await call(`/auction.php?id=${legacyId}&action=delete`, { method: 'POST', user: B });
 });
+await check('free plan: 2 teams are fine, 3 need Pro; admin approves Pro', async () => {
+  const C = helper('user', '3' + Date.now(), 'Chitra');
+  const ADMIN = helper('user', '4' + Date.now(), 'Boss', 'admin');
+  const cid = 'a_' + rnd().slice(0, 14);
+  const withTeams = (n) => ({ ...data('Teams'), teams: Array.from({ length: n }, (_, i) => ({ id: 't' + i, name: 'T' + i })) });
+  const put = (n) => call(`/auction.php?id=${cid}`, { method: 'POST', user: C, body: { name: 'Teams', updatedAt: Date.now(), data: withTeams(n) } });
+  const me = async () => (await json(await call('/session.php', { user: C }))).user;
+  assert.equal((await me()).plan, 'free');
+  assert.equal((await me()).maxTeams, 2);
+  assert.equal((await put(2)).status, 200);
+  r = await put(3);
+  assert.equal(r.status, 402);
+  assert.equal((await r.json()).error, 'pro_required');
+  // Asking for Pro is remembered; ordinary accounts cannot use the admin API.
+  assert.equal((await json(await call('/session.php?action=request_pro', { method: 'POST', user: C }))).user.proRequested, true);
+  assert.equal((await call('/admin.php', { user: C })).status, 403);
+  assert.equal((await call('/admin.php')).status, 401);
+  const list = (await json(await call('/admin.php', { user: ADMIN }))).users;
+  const mine = list.find((u) => u.email.startsWith('3'));
+  assert.ok(mine && mine.proRequested && mine.plan === 'free');
+  assert.equal((await call('/admin.php', { method: 'POST', user: C, body: { userId: mine.id, plan: 'pro' } })).status, 403);
+  // Pro without payment is allowed (testing); payment can be ticked separately.
+  r = await call('/admin.php', { method: 'POST', user: ADMIN, body: { userId: mine.id, plan: 'pro', paymentDone: false } });
+  assert.deepEqual([(await r.json()).user.plan, (await me()).paymentDone, (await me()).proRequested], ['pro', false, false]);
+  assert.equal((await put(3)).status, 200);
+  await call('/admin.php', { method: 'POST', user: ADMIN, body: { userId: mine.id, plan: 'free', paymentDone: true } });
+  assert.equal((await me()).paymentDone, true);
+  // An auction that already has 3 teams keeps saving after a downgrade; a 4th is refused.
+  assert.equal((await put(3)).status, 200);
+  assert.equal((await put(4)).status, 402);
+  // Suspended accounts cannot save, and nobody can suspend themselves.
+  await call('/admin.php', { method: 'POST', user: ADMIN, body: { userId: mine.id, suspended: true } });
+  r = await put(2);
+  assert.equal(r.status, 403);
+  assert.equal((await r.json()).error, 'suspended');
+  const adminId = list.find((u) => u.isAdmin && u.email.startsWith('4')).id;
+  assert.equal((await call('/admin.php', { method: 'POST', user: ADMIN, body: { userId: adminId, suspended: true } })).status, 400);
+  await call(`/auction.php?id=${cid}&action=delete`, { method: 'POST', user: ADMIN });
+});
 await check('login refuses a missing or fake Google credential', async () => {
   assert.equal((await call('/login.php', { method: 'POST', body: { credential: 'nope' } })).status, 400);
   r = await call('/login.php', { method: 'POST', body: { credential: 'aaa.bbb.ccc' } });

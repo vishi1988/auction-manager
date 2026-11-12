@@ -5,4 +5,6 @@
 return [
     // Google Cloud -> Google Auth Platform -> Clients -> "KhiladiAuction website"
     'google_client_id' => '231856169250-ij1dqp39g4a2ai5q2ll422cj7psvaos5.apps.googleusercontent.com',
+    // Verified Google emails that are super admins (they approve accounts and Pro plans).
+    'admin_emails' => ['vishal.chaskar1988@gmail.com'],
 ];

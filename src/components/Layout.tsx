@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, Gavel, LayoutDashboard, LayoutGrid, Menu, MonitorPlay, Plus, Settings2, Trophy, UserRound, UsersRound } from 'lucide-react';
+import { ArrowLeft, Check, Gavel, LayoutDashboard, LayoutGrid, Menu, MonitorPlay, Plus, Settings2, ShieldCheck, Trophy, UserRound, UsersRound } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { APP_NAME, APP_TAGLINE } from '../brand';
@@ -55,6 +55,7 @@ function CloudLine() {
 
 /** Layout for pages outside a single auction (My Auctions, Account). */
 export function AppLayout() {
+  const { user } = useAuth();
   return (
     <Shell
       title={APP_NAME}
@@ -63,6 +64,7 @@ export function AppLayout() {
           <div className="nav-label">Workspace</div>
           <NavLink to="/" end className="nav-item"><LayoutGrid size={18} />My Auctions</NavLink>
           <NavLink to="/account" className="nav-item"><UserRound size={18} />Account</NavLink>
+          {user?.isAdmin && <NavLink to="/admin" className="nav-item"><ShieldCheck size={18} />Super admin</NavLink>}
           <div className="nav-label">Quick start</div>
           <Link to="/?new=1" className="nav-item"><Plus size={18} />New auction</Link>
         </>

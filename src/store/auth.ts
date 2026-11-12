@@ -12,6 +12,27 @@ export interface User {
   email: string;
   name: string;
   picture: string;
+  /** Super admin: approves accounts and gives the Pro plan. */
+  isAdmin?: boolean;
+  /** Free accounts run auctions with 2 teams; Pro has no team limit. */
+  plan?: 'free' | 'pro';
+  paymentDone?: boolean;
+  suspended?: boolean;
+  /** This account has asked the super admin for Pro. */
+  proRequested?: boolean;
+  /** Team limit for this account, or null for no limit. */
+  maxTeams?: number | null;
+}
+
+/** Teams a free account may have. Matches FREE_MAX_TEAMS in the PHP API. */
+export const FREE_MAX_TEAMS = 2;
+
+/** Whether this browser may have `count` teams in one auction (no limit offline or in local builds). */
+export function teamLimitReached(count: number): boolean {
+  if (!CLOUD) return false;
+  const u = auth.user;
+  if (u?.isAdmin || u?.plan === 'pro') return false;
+  return count >= FREE_MAX_TEAMS;
 }
 
 export interface AuthState {
@@ -106,6 +127,32 @@ export async function signInWithGoogle(credential: string): Promise<void> {
     const code = (err as Error).message;
     set({ busy: false, error: reasons[code] ?? ((err as { status?: number }).status ? 'Sign-in was refused (' + code + ').' : 'No internet right now. Please try again.') });
   }
+}
+
+/** A free account asks the super admin for Pro. Returns true when the request was recorded. */
+export async function requestPro(): Promise<boolean> {
+  try {
+    const res = await call('session.php?action=request_pro', {});
+    const user = res.user as User;
+    cacheUser(user);
+    set({ user });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Super admin API (admin.php). */
+export const adminApi = {
+  list: async () => (await call('admin.php')).users as AdminUser[],
+  update: async (userId: number, patch: { plan?: 'free' | 'pro'; paymentDone?: boolean; suspended?: boolean }) =>
+    (await call('admin.php', { userId, ...patch })).user as User,
+};
+
+export interface AdminUser extends User {
+  auctions: number;
+  createdAt: number;
+  lastLoginAt: number;
 }
 
 export async function signOut(): Promise<void> {

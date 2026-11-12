@@ -4,7 +4,7 @@ import { resetAuction } from '../lib/auction';
 import { playerFromRegistration, sameMobile } from '../lib/registration';
 import type { AppState, AuctionMeta, Registration } from '../types';
 import { createLocalBackend, takeLegacyState, type IndexData, type SyncBackend } from './backend';
-import { getAuth, onUserChange } from './auth';
+import { FREE_MAX_TEAMS, getAuth, onUserChange, teamLimitReached } from './auth';
 import type { Cloud, CloudStatus, RemoteAuction } from './cloud';
 import { API_BASE, CLOUD } from './cloudConfig';
 
@@ -232,6 +232,9 @@ function pushToCloud(id: string, s: AppState) {
     }
     return;
   }
+  // Free accounts cannot put an auction with more than 2 teams online (the
+  // server would refuse it). It stays on this device until the account is Pro.
+  if (overFreeLimit(s) && !(id in synced)) return;
   const at = Date.now();
   const isNew = !(id in synced);
   setSynced({ ...synced, [id]: at });
@@ -248,6 +251,25 @@ function dropFromCloud(id: string) {
   const token = tokenFor(id);
   void cloudReady?.then((c) => c.removeAuction(id, token), () => {});
   refreshCloudInfo();
+}
+
+/** True when this auction has more teams than the signed-in free account may put online. */
+export function overFreeLimit(s: AppState): boolean {
+  return s.teams.length > FREE_MAX_TEAMS && teamLimitReached(FREE_MAX_TEAMS);
+}
+
+/**
+ * Makes one auction reachable from other phones (the demo starts out only on
+ * this browser, so its links show "not found" to everyone else). Needs sign-in.
+ */
+export function goOnline(id: string): boolean {
+  if (!getAuth().user) return false;
+  const s = backend.loadAuction(id);
+  if (!s || overFreeLimit(s)) return false;
+  localOnlyIds = localOnlyIds.filter((x) => x !== id);
+  saveList(LOCAL_ONLY_KEY, localOnlyIds);
+  pushToCloud(id, s);
+  return true;
 }
 
 /** Puts every auction that is only in this browser into the cloud. Returns how many. */

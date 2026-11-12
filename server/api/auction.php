@@ -57,6 +57,7 @@ if (($_GET['action'] ?? '') === 'delete') {
 }
 
 $user = require_user();
+if (!empty($user['suspended'])) fail(403, 'suspended');
 $hash = owner_hash() ?? hash('sha256', bin2hex(random_bytes(32)));
 $body = json_body(MAX_AUCTION_BYTES + 10_000);
 $data = $body['data'] ?? null;
@@ -65,6 +66,19 @@ $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 if ($json === false || strlen($json) > MAX_AUCTION_BYTES) fail(413, 'too_large');
 $name = mb_substr(is_string($body['name'] ?? null) ? $body['name'] : '', 0, 200);
 $updatedAt = is_int($body['updatedAt'] ?? null) ? $body['updatedAt'] : now_ms();
+
+// Free plan: at most FREE_MAX_TEAMS teams. An older auction that already has
+// more keeps saving, so nobody loses work when the rule is introduced.
+if (!is_pro($user) && is_array($data['teams']) && count($data['teams']) > FREE_MAX_TEAMS) {
+    $before = 0;
+    if ($existing) {
+        $old = db()->prepare('SELECT data FROM auctions WHERE id = ?');
+        $old->execute([$id]);
+        $oldData = json_decode((string)$old->fetchColumn(), true);
+        $before = is_array($oldData['teams'] ?? null) ? count($oldData['teams']) : 0;
+    }
+    if (count($data['teams']) > max($before, FREE_MAX_TEAMS)) fail(402, 'pro_required');
+}
 
 if (!$existing) {
     try {

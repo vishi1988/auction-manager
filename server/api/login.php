@@ -48,6 +48,12 @@ if ($id === false) {
         ->execute([$email, $name, $picture, $now, $id]);
 }
 
+// The super admin is whoever's verified email is listed in settings.php (admin_emails).
+$admins = array_map('strtolower', array_filter((array)(app_settings()['admin_emails'] ?? []), 'is_string'));
+if ($email !== '' && in_array(strtolower($email), $admins, true)) {
+    $pdo->prepare('UPDATE users SET is_admin = 1 WHERE id = ?')->execute([$id]);
+}
+
 // Old sessions are cleared now and then, so the table stays small.
 if (random_int(1, 50) === 1) $pdo->prepare('DELETE FROM sessions WHERE expires_at < ?')->execute([$now]);
 
@@ -57,7 +63,9 @@ $pdo->prepare('INSERT INTO sessions (token_hash, user_id, created_at, expires_at
     ->execute([hash('sha256', $token), $id, $now, $expires]);
 set_session_cookie($token, intdiv($expires, 1000));
 
-ok(['user' => public_user(['id' => $id, 'email' => $email, 'name' => $name, 'picture' => $picture])]);
+$row = $pdo->prepare('SELECT id, email, name, picture, is_admin, plan, payment_done, suspended, pro_requested_at FROM users WHERE id = ?');
+$row->execute([$id]);
+ok(['user' => public_user($row->fetch())]);
 
 /** Asks Google to check the ID token and returns its claims, or null if Google says no. */
 function google_token_claims(string $idToken): ?array

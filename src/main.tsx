@@ -13,6 +13,7 @@ const page = <K extends string>(load: () => Promise<Record<K, React.ComponentTyp
 
 const Home = page(() => import('./pages/Home'), 'Home');
 const Account = page(() => import('./pages/Account'), 'Account');
+const Admin = page(() => import('./pages/Admin'), 'Admin');
 const Overview = page(() => import('./pages/Overview'), 'Overview');
 const Settings = page(() => import('./pages/Settings'), 'Settings');
 const Teams = page(() => import('./pages/Teams'), 'Teams');
@@ -45,6 +46,7 @@ createRoot(document.getElementById('root')!).render(
           <Route element={<AppLayout />}>
             <Route index element={<Home />} />
             <Route path="account" element={<Account />} />
+            <Route path="admin" element={<Admin />} />
           </Route>
           <Route path="a/:auctionId" element={<AuctionRoute />}>
             <Route element={<AuctionLayout />}>

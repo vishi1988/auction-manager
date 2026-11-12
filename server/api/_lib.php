@@ -19,6 +19,8 @@ const MAX_PHOTO_BYTES = 400_000;       // one photo or logo, as a data: URL
 const MAX_PHOTOS_PER_SAVE = 60;
 const MAX_PENDING_REGISTRATIONS = 500; // forms waiting for the organiser's app to collect them
 
+const FREE_MAX_TEAMS = 2; // accounts on the free plan can run auctions with this many teams
+
 const SESSION_COOKIE = 'ka_session';
 const SESSION_DAYS = 60;
 
@@ -30,7 +32,7 @@ function app_settings(): array
         $file = __DIR__ . '/settings.php';
         $s = is_file($file) ? (require $file) : [];
         // config.php (private, made on the server) may override them.
-        $s = array_merge($s, array_intersect_key(config_or_empty(), ['google_client_id' => 1]));
+        $s = array_merge($s, array_intersect_key(config_or_empty(), ['google_client_id' => 1, 'admin_emails' => 1]));
     }
     return $s;
 }
@@ -123,6 +125,16 @@ function ensure_tables(PDO $pdo): void
         created_at BIGINT NOT NULL,
         PRIMARY KEY (auction_id, id)
     )' . $tail);
+    // Roles and plans: the super admin approves accounts (see admin.php).
+    foreach ([
+        'is_admin' => 'TINYINT NOT NULL DEFAULT 0',
+        'plan' => "VARCHAR(10) NOT NULL DEFAULT 'free'",
+        'payment_done' => 'TINYINT NOT NULL DEFAULT 0',
+        'suspended' => 'TINYINT NOT NULL DEFAULT 0',
+        'pro_requested_at' => 'BIGINT NOT NULL DEFAULT 0',
+    ] as $col => $def) {
+        if (!column_exists($pdo, 'users', $col)) $pdo->exec('ALTER TABLE users ADD COLUMN ' . $col . ' ' . $def);
+    }
     if (!column_exists($pdo, 'auctions', 'user_id')) {
         $pdo->exec('ALTER TABLE auctions ADD COLUMN user_id INT NULL');
         $pdo->exec('CREATE INDEX auctions_user ON auctions (user_id)');
@@ -234,7 +246,7 @@ function current_user(): ?array
     $done = true;
     $token = $_COOKIE[SESSION_COOKIE] ?? '';
     if (!is_string($token) || !preg_match('/^[a-f0-9]{64}$/', $token)) return null;
-    $q = db()->prepare('SELECT u.id, u.email, u.name, u.picture FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?');
+    $q = db()->prepare('SELECT u.id, u.email, u.name, u.picture, u.is_admin, u.plan, u.payment_done, u.suspended, u.pro_requested_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?');
     $q->execute([hash('sha256', $token), now_ms()]);
     $user = $q->fetch() ?: null;
     if ($user) $user['id'] = (int)$user['id'];
@@ -267,7 +279,29 @@ function set_session_cookie(string $token, int $expiresSec): void
 /** What the app is told about a user. */
 function public_user(array $u): array
 {
-    return ['id' => (int)$u['id'], 'email' => $u['email'], 'name' => $u['name'], 'picture' => $u['picture']];
+    return [
+        'id' => (int)$u['id'], 'email' => $u['email'], 'name' => $u['name'], 'picture' => $u['picture'],
+        'isAdmin' => !empty($u['is_admin']),
+        'plan' => is_pro($u) ? 'pro' : 'free',
+        'paymentDone' => !empty($u['payment_done']),
+        'suspended' => !empty($u['suspended']),
+        'proRequested' => (int)($u['pro_requested_at'] ?? 0) > 0,
+        'maxTeams' => is_pro($u) ? null : FREE_MAX_TEAMS,
+    ];
+}
+
+/** Pro accounts (and the super admin) can use any number of teams. */
+function is_pro(array $u): bool
+{
+    return !empty($u['is_admin']) || ($u['plan'] ?? 'free') === 'pro';
+}
+
+/** Stops unless the signed-in user is the super admin. */
+function require_admin(): array
+{
+    $u = require_user();
+    if (empty($u['is_admin'])) fail(403, 'admin_only');
+    return $u;
 }
 
 /** The auction as viewers may see it: players' and owners' phone numbers removed. */

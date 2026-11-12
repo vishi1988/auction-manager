@@ -14,8 +14,8 @@ $pdo = db();
 $now = now_ms();
 
 if ($mode === 'user') {
-    $pdo->prepare('INSERT INTO users (google_sub, email, name, picture, created_at, last_login_at) VALUES (?, ?, ?, \'\', ?, ?)')
-        ->execute([$a, $a . '@example.com', $b, $now, $now]);
+    $pdo->prepare('INSERT INTO users (google_sub, email, name, picture, created_at, last_login_at, is_admin) VALUES (?, ?, ?, \'\', ?, ?, ?)')
+        ->execute([$a, $a . '@example.com', $b, $now, $now, ($argv[4] ?? '') === 'admin' ? 1 : 0]);
     $token = bin2hex(random_bytes(32));
     $pdo->prepare('INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)')
         ->execute([hash('sha256', $token), (int)$pdo->lastInsertId(), $now, $now + 3_600_000]);
