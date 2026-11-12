@@ -125,6 +125,23 @@ function ensure_tables(PDO $pdo): void
         created_at BIGINT NOT NULL,
         PRIMARY KEY (auction_id, id)
     )' . $tail);
+    // Bids tapped on team owners' phones (bid.php). Like registrations they wait
+    // here until the organiser's app applies them to the auction.
+    $pdo->exec('CREATE TABLE IF NOT EXISTS bids (
+        auction_id VARCHAR(48) NOT NULL,
+        id VARCHAR(48) NOT NULL,
+        team_id VARCHAR(48) NOT NULL,
+        kind VARCHAR(8) NOT NULL DEFAULT \'bid\',
+        seen VARCHAR(32) NOT NULL DEFAULT \'\',
+        status TINYINT NOT NULL DEFAULT 0,
+        claim VARCHAR(24) NOT NULL DEFAULT \'\',
+        claimed_at BIGINT NOT NULL DEFAULT 0,
+        ok TINYINT NOT NULL DEFAULT 0,
+        tie TINYINT NOT NULL DEFAULT 0,
+        reason VARCHAR(200) NOT NULL DEFAULT \'\',
+        created_at BIGINT NOT NULL,
+        PRIMARY KEY (auction_id, id)
+    )' . $tail);
     // Roles and plans: the super admin approves accounts (see admin.php).
     foreach ([
         'is_admin' => 'TINYINT NOT NULL DEFAULT 0',
@@ -309,7 +326,7 @@ function public_view(string $json): string
 {
     $d = json_decode($json, true);
     if (!is_array($d)) return $json;
-    foreach (['players' => ['mobile'], 'teams' => ['ownerMobile']] as $list => $fields) {
+    foreach (['players' => ['mobile'], 'teams' => ['ownerMobile', 'ownerKey']] as $list => $fields) {
         if (!isset($d[$list]) || !is_array($d[$list])) continue;
         foreach ($d[$list] as $i => $item) {
             if (is_array($item)) foreach ($fields as $f) unset($d[$list][$i][$f]);

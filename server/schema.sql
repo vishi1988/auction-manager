@@ -58,3 +58,20 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 ALTER TABLE auctions ADD COLUMN user_id INT NULL;  -- added automatically when missing
 CREATE INDEX auctions_user ON auctions (user_id);
+
+-- Bids tapped on team owners' phones (bid.php); the API creates this table by itself.
+CREATE TABLE IF NOT EXISTS bids (
+  auction_id VARCHAR(48) NOT NULL,
+  id VARCHAR(48) NOT NULL,
+  team_id VARCHAR(48) NOT NULL,
+  kind VARCHAR(8) NOT NULL DEFAULT 'bid',
+  seen VARCHAR(32) NOT NULL DEFAULT '',
+  status TINYINT NOT NULL DEFAULT 0,
+  claim VARCHAR(24) NOT NULL DEFAULT '',
+  claimed_at BIGINT NOT NULL DEFAULT 0,
+  ok TINYINT NOT NULL DEFAULT 0,
+  tie TINYINT NOT NULL DEFAULT 0,
+  reason VARCHAR(200) NOT NULL DEFAULT '',
+  created_at BIGINT NOT NULL,
+  PRIMARY KEY (auction_id, id)
+);

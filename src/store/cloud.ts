@@ -18,6 +18,22 @@ export interface RemoteAuction {
   state: AppState;
 }
 
+/** A bid an owner tapped on their phone, waiting for the organiser's app. */
+export interface PendingBid {
+  id: string;
+  teamId: string;
+  kind: 'bid' | 'join';
+  seen: number | null;
+}
+
+/** What the organiser's app did with a bid; sent back so the owner's phone can say so. */
+export interface BidOutcome {
+  id: string;
+  ok: boolean;
+  tie?: boolean;
+  reason?: string;
+}
+
 export type CloudStatus =
   | { kind: 'connecting' }
   | { kind: 'on' }
@@ -40,9 +56,14 @@ export interface Cloud {
     token: string | null,
     onChange: (remote: RemoteAuction | null) => void,
     onRegistrations?: (forms: Registration[]) => boolean,
+    onBids?: (bids: PendingBid[]) => BidOutcome[] | null,
   ): () => void;
   /** Sends a player's registration form. Rejects with the server's reason ('already_registered', 'closed', …). */
   register(id: string, form: Registration): Promise<void>;
+  /** Is this team's private link good? */
+  checkOwnerKey(id: string, teamId: string, key: string): Promise<boolean>;
+  /** A team owner taps BID: waits (up to ~10 s) until the organiser's app has answered. */
+  ownerBid(id: string, teamId: string, key: string, kind: 'bid' | 'join', seen: number | null): Promise<BidOutcome>;
   status(): CloudStatus;
   onStatus(listener: () => void): () => void;
 }
@@ -176,13 +197,37 @@ export function createCloud(apiBase: string): Cloud {
     token: string | null,
     onChange: (remote: RemoteAuction | null) => void,
     onRegistrations?: (forms: Registration[]) => boolean,
+    onBids?: (bids: PendingBid[]) => BidOutcome[] | null,
   ) {
     let stopped = false;
+    let bidTimer: ReturnType<typeof setTimeout> | null = null;
+    let bidsRunning = false;
     let version = 0;
     let photosVersion = -1;
     let photos: PhotoMap = {};
     let timer: ReturnType<typeof setTimeout> | null = null;
     let mine = false;
+
+    // Bids from owners' phones need an answer within a second or two, so the
+    // organiser's browser checks for them often (a cheap request) while it is on screen.
+    const pollBids = async () => {
+      if (stopped || !mine || !onBids) {
+        bidsRunning = false;
+        return;
+      }
+      if (document.visibilityState === 'visible') {
+        try {
+          const items = ((await request('bid.php?id=' + id, { token }))?.items as PendingBid[] | undefined) ?? [];
+          if (items.length && !stopped) {
+            const results = onBids(items);
+            if (results) await request(`bid.php?id=${id}&action=done`, { method: 'POST', token, body: { results } });
+          }
+        } catch {
+          // Offline or busy: the next check tries again. Unconfirmed bids return to the queue by themselves.
+        }
+      }
+      if (!stopped) bidTimer = setTimeout(pollBids, 1000);
+    };
 
     const schedule = () => {
       if (stopped) return;
@@ -200,6 +245,10 @@ export function createCloud(apiBase: string): Cloud {
         if (res) {
           version = res.version as number;
           mine = res.mine as boolean;
+          if (mine && onBids && !bidsRunning) {
+            bidsRunning = true;
+            void pollBids();
+          }
           if (res.photosVersion !== photosVersion) {
             const p = await request('photos.php?id=' + id).catch(() => null);
             if (p) {
@@ -238,6 +287,7 @@ export function createCloud(apiBase: string): Cloud {
     return () => {
       stopped = true;
       if (timer) clearTimeout(timer);
+      if (bidTimer) clearTimeout(bidTimer);
       document.removeEventListener('visibilitychange', onVisible);
     };
   }
@@ -275,6 +325,39 @@ export function createCloud(apiBase: string): Cloud {
       } catch (err) {
         throw new Error(err instanceof HttpError ? err.code : 'offline');
       }
+    },
+    async checkOwnerKey(id, teamId, key) {
+      try {
+        await request(`bid.php?id=${id}&team=${encodeURIComponent(teamId)}&key=${encodeURIComponent(key)}`);
+        return true;
+      } catch (err) {
+        if (err instanceof HttpError) return false;
+        throw err;
+      }
+    },
+    async ownerBid(id, teamId, key, kind, seen) {
+      let sent: Record<string, unknown> | null;
+      try {
+        sent = await request('bid.php?id=' + id, { method: 'POST', body: { teamId, key, kind, seen } });
+      } catch (err) {
+        if (err instanceof HttpError) {
+          return { id: '', ok: false, reason: err.code === 'too_many' ? 'Slow down — your last bid is still being checked' : err.code === 'closed' ? 'Owner bidding is turned off by the organiser' : 'Could not send the bid (' + err.code + ')' };
+        }
+        return { id: '', ok: false, reason: 'No internet. The bid was not sent' };
+      }
+      const bidId = String(sent?.id ?? '');
+      // The organiser's app answers within a second or two.
+      for (let i = 0; i < 20; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        try {
+          const res = await request(`bid.php?id=${id}&team=${encodeURIComponent(teamId)}&key=${encodeURIComponent(key)}&bid=${bidId}`);
+          if (res?.status === 'done') return { id: bidId, ok: !!res.ok, tie: !!res.tie, reason: String(res.reason ?? '') };
+          if (res?.status === 'gone') break;
+        } catch {
+          // Brief network trouble: keep waiting.
+        }
+      }
+      return { id: bidId, ok: false, reason: 'No answer from the auction desk. Check the screen and try again' };
     },
     status: () => status,
     onStatus(listener) {

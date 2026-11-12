@@ -1,11 +1,12 @@
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useAuctionPath } from '../components/AuctionRoute';
 import { PlayerAvatar, TeamBadge, Toast, useCountdown, useToast } from '../components/ui';
 import { LuckyDraw } from '../components/LuckyDraw';
 import { joinDraw, placeBid, type BidResult } from '../lib/auction';
 import { money } from '../lib/format';
 import { atUpperLimit, basePriceOf, categoryOf, checkBid, checkJoinDraw, currentPlayer, leadingBid, teamStats, tiedTeams } from '../lib/rules';
-import { update, useAppState } from '../store/store';
+import { checkOwnerKey, sendOwnerBid, update, useAppState, useAuctionStatus } from '../store/store';
 
 /** Phone screen for a team owner: see the player on the block and tap BID. */
 export function Owner() {
@@ -16,9 +17,38 @@ export function Owner() {
   const secs = useCountdown(auction.timerEndsAt, auction.timerPausedLeft);
   const [toast, showToast] = useToast();
   const path = useAuctionPath();
+  // On the organiser's own device bids go straight in. On an owner's phone the
+  // auction is view-only, so the private link's key is checked and bids are sent
+  // to the organiser's app.
+  const remote = useAuctionStatus() === 'view-only';
+  const key = useSearchParams()[0].get('k') ?? '';
+  const [keyState, setKeyState] = useState<'checking' | 'ok' | 'bad'>('checking');
+  const [sending, setSending] = useState(false);
+  useEffect(() => {
+    if (!remote || !teamId) return;
+    let live = true;
+    setKeyState('checking');
+    void checkOwnerKey(teamId, key).then((ok) => live && setKeyState(ok ? 'ok' : 'bad'));
+    return () => {
+      live = false;
+    };
+  }, [remote, teamId, key]);
 
   if (!settings.ownerBidding) {
     return <div className="phone phone-dark"><div className="empty" style={{ color: '#93a3bb' }}>Owner bidding is turned off by the organiser.</div></div>;
+  }
+
+  if (remote && (!team || keyState !== 'ok')) {
+    return (
+      <div className="phone phone-dark" style={{ padding: 20, gap: 12 }}>
+        <h1 className="display" style={{ fontSize: 30 }}>{settings.name}</h1>
+        <div className="empty" style={{ color: '#93a3bb' }}>
+          {team && keyState === 'checking'
+            ? 'Checking your link…'
+            : 'This is not a valid team link. Ask the organiser for your team’s private bidding link.'}
+        </div>
+      </div>
+    );
   }
 
   if (!team) {
@@ -32,7 +62,7 @@ export function Owner() {
             <span style={{ fontWeight: 600 }}>{t.name}</span>
           </Link>
         ))}
-        <p className="hint">In the online version each owner will get a private login link.</p>
+        <p className="hint">Owners get their own private link from the Teams page, so they can bid from their phones.</p>
       </div>
     );
   }
@@ -51,6 +81,17 @@ export function Owner() {
   const seen = lead?.amount ?? null;
 
   const bid = () => {
+    if (remote) {
+      if (sending) return;
+      setSending(true);
+      void sendOwnerBid(team.id, key, join.ok ? 'join' : 'bid', join.ok ? null : seen).then((r) => {
+        setSending(false);
+        if (!r.ok) showToast(r.reason ?? 'Bid not accepted');
+        else if (r.tie) showToast('Tied! You are in the lucky draw');
+        else showToast('Bid placed');
+      });
+      return;
+    }
     let result = null as BidResult | null;
     update((s) => {
       result = join.ok ? joinDraw(s, team.id, Date.now()) : placeBid(s, team.id, Date.now(), seen);
@@ -119,9 +160,9 @@ export function Owner() {
           )}
 
           <span className="spacer" />
-          <button className="bid-big" disabled={!check.ok || phase !== 'bidding'} onClick={bid}>
+          <button className="bid-big" disabled={!check.ok || phase !== 'bidding' || sending} onClick={bid}>
             <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: '0.1em', opacity: 0.8 }}>
-              {phase !== 'bidding' ? 'WAIT FOR NEXT PLAYER' : join.ok ? '✦ YES, I WANT HIM · LUCKY DRAW AT' : check.ok ? 'TAP TO BID' : check.reason.toUpperCase()}
+              {phase !== 'bidding' ? 'WAIT FOR NEXT PLAYER' : sending ? 'SENDING YOUR BID…' : join.ok ? '✦ YES, I WANT HIM · LUCKY DRAW AT' : check.ok ? 'TAP TO BID' : check.reason.toUpperCase()}
             </span>
             <span className="display num" style={{ fontSize: 44, lineHeight: 1 }}>{money(check.amount, settings.unit)}</span>
           </button>

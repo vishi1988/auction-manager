@@ -1,11 +1,11 @@
 import { useSyncExternalStore } from 'react';
 import { createDummyState, migrateState } from '../data/dummy';
-import { resetAuction } from '../lib/auction';
+import { joinDraw, placeBid, resetAuction, type BidResult } from '../lib/auction';
 import { playerFromRegistration, sameMobile } from '../lib/registration';
 import type { AppState, AuctionMeta, Registration } from '../types';
 import { createLocalBackend, takeLegacyState, type IndexData, type SyncBackend } from './backend';
 import { FREE_MAX_TEAMS, getAuth, onUserChange, teamLimitReached } from './auth';
-import type { Cloud, CloudStatus, RemoteAuction } from './cloud';
+import type { BidOutcome, Cloud, CloudStatus, PendingBid, RemoteAuction } from './cloud';
 import { API_BASE, CLOUD } from './cloudConfig';
 
 const backend: SyncBackend = createLocalBackend();
@@ -480,7 +480,7 @@ export function watchAuction(id: string): () => void {
   const timer = setTimeout(giveUp, 12000);
   void cloudReady.then(
     (c) => {
-      if (!cancelled) stop = c.watchAuction(id, tokenFor(id), (remote) => onRemote(id, remote), (forms) => addRegistrations(id, forms));
+      if (!cancelled) stop = c.watchAuction(id, tokenFor(id), (remote) => onRemote(id, remote), (forms) => addRegistrations(id, forms), (bids) => applyOwnerBids(id, bids));
     },
     giveUp,
   );
@@ -501,6 +501,60 @@ function addRegistrations(id: string, forms: Registration[]): boolean {
     }
   });
   return true;
+}
+
+/**
+ * Bids tapped on team owners' phones arrive here, on the organiser's device.
+ * They go through the same rules as the console (budget, squad, "too late"),
+ * all inside one update, so two owners tapping together become a tie.
+ * Returns what happened to each, or null when this device cannot apply them.
+ */
+function applyOwnerBids(id: string, bids: PendingBid[]): BidOutcome[] | null {
+  if (id !== currentId || viewOnly || !state) return null;
+  const out: BidOutcome[] = [];
+  update((s) => {
+    const now = Date.now();
+    for (const b of bids) {
+      const team = s.teams.find((t) => t.id === b.teamId);
+      if (!team || s.settings.ownerBidding === false) {
+        out.push({ id: b.id, ok: false, reason: 'Owner bidding is not available for this team' });
+        continue;
+      }
+      const r: BidResult = b.kind === 'join' ? joinDraw(s, team.id, now) : placeBid(s, team.id, now, b.seen);
+      out.push(r.ok ? { id: b.id, ok: true, tie: r.tie } : { id: b.id, ok: false, reason: r.reason });
+    }
+  });
+  return out;
+}
+
+/** True when the open auction is being watched from another device (owner phones, projector). */
+export const isViewOnly = () => viewOnly;
+
+/** Is the private link of this team good? (Only the server knows the keys.) */
+export async function checkOwnerKey(teamId: string, key: string): Promise<boolean> {
+  if (!currentId) return false;
+  const c = await cloudReady?.catch(() => null);
+  if (!c) return false;
+  try {
+    return await c.checkOwnerKey(currentId, teamId, key);
+  } catch {
+    return false;
+  }
+}
+
+/** A team owner taps BID (or "yes, I want him" for a lucky draw) on a device that cannot change the auction. */
+export async function sendOwnerBid(teamId: string, key: string, kind: 'bid' | 'join', seen: number | null): Promise<BidOutcome> {
+  const c = currentId ? await cloudReady?.catch(() => null) : null;
+  if (!c || !currentId) return { id: '', ok: false, reason: 'No internet. The bid was not sent' };
+  return c.ownerBid(currentId, teamId, key, kind, seen);
+}
+
+/** Gives every team a private key (needed once, for the owner links). Organiser's device only. */
+export function ensureOwnerKeys() {
+  if (viewOnly || !state || state.teams.every((t) => t.ownerKey)) return;
+  update((s) => {
+    for (const t of s.teams) if (!t.ownerKey) t.ownerKey = Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, '0')).join('');
+  });
 }
 
 export type RegistrationResult = 'ok' | 'already_registered' | 'closed' | 'offline' | 'failed';

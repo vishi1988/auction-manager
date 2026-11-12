@@ -202,6 +202,43 @@ await check('only its account can delete; then it is gone', async () => {
   assert.equal((await call(`/photos.php?id=${id}`)).status, 404);
   await call(`/auction.php?id=${legacyId}&action=delete`, { method: 'POST', user: B });
 });
+await check('owner bidding: private key, queue, one claim, result, no leaks', async () => {
+  const bid = 'a_' + rnd().slice(0, 14);
+  const KEY = randomBytes(8).toString('hex');
+  const d = { ...data('Bids'), teams: [{ id: 't1', name: 'One', ownerKey: KEY, ownerMobile: '9999999999' }, { id: 't2', name: 'Two', ownerKey: randomBytes(8).toString('hex') }] };
+  await call(`/auction.php?id=${bid}`, { method: 'POST', user: A, body: { name: 'Bids', updatedAt: Date.now(), data: d } });
+  // Viewers never see the keys; the organiser does.
+  const pub = await json(await call(`/auction.php?id=${bid}`));
+  assert.ok(!JSON.stringify(pub).includes(KEY));
+  assert.equal((await json(await call(`/auction.php?id=${bid}`, { user: A }))).data.teams[0].ownerKey, KEY);
+  const post = (body) => call(`/bid.php?id=${bid}`, { method: 'POST', body });
+  // Wrong key, missing key, other team's key: refused.
+  assert.equal((await post({ teamId: 't1', key: 'a'.repeat(16), kind: 'bid', seen: null })).status, 403);
+  assert.equal((await post({ teamId: 't1', kind: 'bid' })).status, 403);
+  assert.equal((await post({ teamId: 't2', key: KEY, kind: 'bid', seen: null })).status, 403);
+  assert.equal((await call(`/bid.php?id=${bid}&team=t1&key=${KEY}`)).status, 200);
+  assert.equal((await call(`/bid.php?id=${bid}&team=t1&key=${'b'.repeat(16)}`)).status, 403);
+  // A good bid waits in the queue; only the account can collect it.
+  r = await post({ teamId: 't1', key: KEY, kind: 'bid', seen: 0.5 });
+  assert.equal(r.status, 200);
+  const bidId = (await r.json()).id;
+  assert.equal((await call(`/bid.php?id=${bid}`)).status, 401);
+  assert.equal((await call(`/bid.php?id=${bid}`, { user: B })).status, 403);
+  assert.equal((await json(await call(`/bid.php?id=${bid}&team=t1&key=${KEY}&bid=${bidId}`))).status, 'pending');
+  const got = (await json(await call(`/bid.php?id=${bid}`, { user: A }))).items;
+  assert.deepEqual(got.map((b) => [b.id, b.teamId, b.kind, b.seen]), [[bidId, 't1', 'bid', 0.5]]);
+  // Claimed once: a second tab asking right away gets nothing.
+  assert.deepEqual((await json(await call(`/bid.php?id=${bid}`, { user: A }))).items, []);
+  // The result goes back to the owner's phone, only for their own bid.
+  assert.equal((await call(`/bid.php?id=${bid}&action=done`, { method: 'POST', user: B, body: { results: [] } })).status, 403);
+  await call(`/bid.php?id=${bid}&action=done`, { method: 'POST', user: A, body: { results: [{ id: bidId, ok: false, reason: 'Too late' }] } });
+  assert.deepEqual(await json(await call(`/bid.php?id=${bid}&team=t1&key=${KEY}&bid=${bidId}`)), { status: 'done', ok: false, tie: false, reason: 'Too late' });
+  // Owner bidding switched off: refused.
+  d.settings.ownerBidding = false;
+  await call(`/auction.php?id=${bid}`, { method: 'POST', user: A, body: { name: 'Bids', updatedAt: Date.now() + 1, data: d } });
+  assert.equal((await post({ teamId: 't1', key: KEY, kind: 'bid', seen: null })).status, 403);
+  await call(`/auction.php?id=${bid}&action=delete`, { method: 'POST', user: A });
+});
 await check('free plan: 2 teams are fine, 3 need Pro; admin approves Pro', async () => {
   const C = helper('user', '3' + Date.now(), 'Chitra');
   const ADMIN = helper('user', '4' + Date.now(), 'Boss', 'admin');

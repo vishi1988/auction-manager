@@ -51,6 +51,7 @@ if (($_GET['action'] ?? '') === 'delete') {
     $pdo->beginTransaction();
     $pdo->prepare('DELETE FROM auction_photos WHERE auction_id = ?')->execute([$id]);
     $pdo->prepare('DELETE FROM registrations WHERE auction_id = ?')->execute([$id]);
+    $pdo->prepare('DELETE FROM bids WHERE auction_id = ?')->execute([$id]);
     $pdo->prepare('DELETE FROM auctions WHERE id = ?')->execute([$id]);
     $pdo->commit();
     ok(['deleted' => true]);

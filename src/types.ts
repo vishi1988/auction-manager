@@ -75,6 +75,8 @@ export interface Team {
   key: string;
   logo?: string;
   rtmUsed: number;
+  /** Secret in this team's private bidding link. Viewers never receive it. */
+  ownerKey?: string;
 }
 
 /** A T-shirt ordered on top of the player's own: a second one for the player, or one for someone who is not playing. */

@@ -1,12 +1,15 @@
-import { Pencil, Plus, Shield, Trash2, Users } from 'lucide-react';
-import { useState } from 'react';
+import { Link2, MessageCircle, Pencil, Plus, Shield, Trash2, Users } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { useAuctionPath } from '../components/AuctionRoute';
 import { ProPrompt } from '../components/ProPrompt';
-import { Drawer, EmptyState, TeamBadge, Toast, useToast } from '../components/ui';
+import { shareUrl } from '../components/ScreenLink';
+import { Drawer, EmptyState, TeamBadge, Toast, copyText, useToast } from '../components/ui';
 import { teamLimitReached, useAuth } from '../store/auth';
 import { money, uid } from '../lib/format';
 import { resizeImage } from '../lib/media';
 import { teamStats } from '../lib/rules';
-import { update, useAppState } from '../store/store';
+import { ensureOwnerKeys, update, useAppState, useCloudInfo } from '../store/store';
 import type { Team } from '../types';
 
 const SWATCHES = ['#E5484D', '#2E5BFF', '#FF7A1A', '#7C4DDB', '#12A360', '#D6409F', '#0EA5B7', '#475467', '#B7791F', '#1E3A8A'];
@@ -22,7 +25,24 @@ export function Teams() {
   const [toast, showToast] = useToast();
   const nextColor = SWATCHES[teams.length % SWATCHES.length]!;
   const [proOpen, setProOpen] = useState(false);
+  const path = useAuctionPath();
+  const { auctionId = '' } = useParams();
+  const cloud = useCloudInfo();
   useAuth(); // re-render when the plan changes
+  // Every team gets a secret key for its private bidding link.
+  useEffect(() => ensureOwnerKeys(), [teams.length]);
+  /** The team's private bidding link, for WhatsApp. Only works once the auction is online. */
+  const ownerLink = (t: Team) => (t.ownerKey ? shareUrl(path('/owner/' + t.id) + '?k=' + t.ownerKey) : '');
+  const copyOwnerLink = (t: Team) => {
+    if (cloud.enabled && !cloud.synced.includes(auctionId)) return showToast('Make the auction online first (Overview page), then share the link');
+    copyText(ownerLink(t), showToast, t.name + ' owner link copied');
+  };
+  const whatsappOwner = (t: Team) => {
+    if (cloud.enabled && !cloud.synced.includes(auctionId)) return showToast('Make the auction online first (Overview page), then share the link');
+    const phone = t.ownerMobile.replace(/\D/g, '');
+    const text = `${settings.name}: your private bidding link for ${t.name}. Open it on your phone on auction day. Do not share it.\n${ownerLink(t)}`;
+    window.open((phone.length === 10 ? 'https://wa.me/91' + phone : 'https://wa.me/') + '?text=' + encodeURIComponent(text), '_blank', 'noopener');
+  };
   /** Free accounts can add up to 2 teams; the third shows the Pro prompt. */
   const addTeam = () => (teamLimitReached(teams.length) ? setProOpen(true) : setDraft(blankTeam(nextColor)));
 
@@ -82,6 +102,12 @@ export function Teams() {
                   <div className="row" style={{ marginTop: 'auto', paddingTop: 12, borderTop: '1px solid var(--line-2)', gap: 6 }}>
                     {settings.rtm && <span className="pill pill-orange">RTM {settings.rtmCards - t.rtmUsed}</span>}
                     <span className="spacer" />
+                    {settings.ownerBidding && (
+                      <>
+                        <button className="btn btn-ghost btn-sm btn-icon" aria-label={'Copy ' + t.name + ' owner bidding link'} title="Copy owner's private bidding link" onClick={() => copyOwnerLink(t)}><Link2 size={15} /></button>
+                        <button className="btn btn-ghost btn-sm btn-icon" aria-label={'Send ' + t.name + ' owner link on WhatsApp'} title="Send owner's link on WhatsApp" onClick={() => whatsappOwner(t)}><MessageCircle size={15} /></button>
+                      </>
+                    )}
                     <button className="btn btn-sm" onClick={() => setDraft(structuredClone(t))}><Pencil size={14} />Edit</button>
                     <button className="btn btn-ghost btn-sm btn-icon" aria-label={'Delete ' + t.name} title="Delete team" onClick={() => remove(t)}><Trash2 size={15} /></button>
                   </div>
