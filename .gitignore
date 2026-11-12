@@ -14,3 +14,8 @@ marketing/video/node_modules
 marketing/video/frames
 marketing/*.mp4
 marketing/video/*.wav
+
+marketing/video/tut/
+marketing/video/tut-build/
+marketing/video/tut-check/
+marketing/video/tutorial-music.wav

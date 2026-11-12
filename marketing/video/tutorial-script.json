@@ -1,0 +1,21 @@
+{
+  "voice": "en-IN-NeerjaNeural",
+  "scenes": [
+    { "id": "intro", "card": "intro", "caption": "", "text": "Welcome to Khiladi Auction, free player auction software for local leagues. In this video I will show you how to run a complete auction, from setup to the final sold, in just a few minutes." },
+    { "id": "create", "caption": "Step 1 · Create your auction", "shots": ["s01_home", "s02_new"], "text": "Open khiladiauction dot com slash app and sign in with Google. Click New auction. Type your tournament name, pick the sport, add the date and venue, then press Create auction." },
+    { "id": "checklist", "caption": "Your 4-step checklist", "shots": ["s03_overview"], "text": "This page is your checklist. Four simple steps: details, teams, players, and then auction day." },
+    { "id": "rules", "caption": "Step 2 · Set the rules", "shots": ["s04_rules", "s05_categories"], "text": "In Details and rules, set the purse for every team and the squad size. In Categories, group players into sets like Marquee, A, B and C, each with its own base price and limits." },
+    { "id": "bidding", "caption": "Bid increments", "shots": ["s05b_bidding"], "text": "Bid increments decide how much each new bid goes up. You can make them bigger as the price rises." },
+    { "id": "teams", "caption": "Step 3 · Add your teams", "shots": ["s06_team_form", "s07_teams"], "text": "Next, add your teams. Give each team a name, a short code and a colour. On the free plan you can run an auction with two teams. Pro removes that limit." },
+    { "id": "players", "caption": "Step 4 · Add players from Excel", "shots": ["s08_players_empty", "s08b_players"], "text": "Now add players. Download the Excel template, fill it in, and press Import Excel. Your players appear in seconds, with roles, categories and base prices." },
+    { "id": "register", "caption": "Players register on their phone", "shots": ["s09_regmenu", "s10_register", "s10b_register"], "text": "Or let the players register themselves. Copy the registration link and send it on WhatsApp. Players fill in their details on their own phone, with photo, jersey and T-shirt size, and they arrive straight in your list." },
+    { "id": "share", "caption": "Share links", "shots": ["s11_share"], "text": "The Overview page keeps all your links in one place: the live screen for the projector, the registration form, and bidding links for the team owners." },
+    { "id": "owners", "caption": "Owners bid from their phones", "shots": ["s07_teams", "s16_owner"], "text": "On the Teams page, every team has its own private bidding link. Copy it, or send it to the owner on WhatsApp. Make the auction online first, so the link works on their phone." },
+    { "id": "start", "caption": "Auction day · Start", "shots": ["s12_console_ready"], "text": "On auction day, open the Auction console and press Start auction." },
+    { "id": "bids", "caption": "Auction day · Bidding", "shots": ["s13_console_live", "s13b_bids"], "text": "The next player comes on the block with the base price. Tap the team that raised its paddle, and the price goes up. Team owners can also bid from their own phones." },
+    { "id": "sold", "caption": "Auction day · Sold!", "shots": ["s14_sold"], "text": "When the bidding stops, press Sold. The player goes to the team, the purse updates, and a sold effect plays on the screen." },
+    { "id": "live", "caption": "Live screen for the projector", "shots": ["s15_live"], "text": "Open the live screen on a projector or TV, so everyone at the ground can follow the auction." },
+    { "id": "results", "caption": "Results", "shots": ["s17_results"], "text": "At the end, the Results page shows every team, every player and every price. You can download it all as Excel." },
+    { "id": "outro", "card": "outro", "caption": "", "text": "That is all. Create your first auction, free, at Khiladi Auction dot com. Thank you for watching." }
+  ]
+}
