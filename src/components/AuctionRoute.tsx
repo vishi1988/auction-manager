@@ -1,7 +1,8 @@
 import { ArrowLeft } from 'lucide-react';
-import { useEffect } from 'react';
-import { Link, Outlet, useLocation, useParams } from 'react-router-dom';
-import { openAuction, useAuctionStatus, watchAuction } from '../store/store';
+import { useEffect, type ReactNode } from 'react';
+import { Link, Navigate, Outlet, useLocation, useParams } from 'react-router-dom';
+import { canOpen, type Area } from '../lib/roles';
+import { openAuction, useAuctionStatus, useRole, watchAuction } from '../store/store';
 import { EMBED } from './ScreenLink';
 
 /** Opens the auction named in the URL for everything rendered inside it. */
@@ -34,7 +35,7 @@ export function AuctionRoute() {
     );
   }
   // In the embed preview, public screens open in place, so give them a way back.
-  const publicScreen = /\/(live|owner|register)(\/|$)/.test(pathname);
+  const publicScreen = /\/(live|overlay|owner|register)(\/|$)/.test(pathname);
   return (
     <>
       {/* key: remount pages when switching auctions so local page state resets. */}
@@ -46,6 +47,14 @@ export function AuctionRoute() {
       )}
     </>
   );
+}
+
+/** Shows a screen only to the roles allowed to use it; others land on the auction's overview. */
+export function RequireRole({ area, children }: { area: Area; children: ReactNode }) {
+  const role = useRole();
+  const path = useAuctionPath();
+  if (!canOpen(role, area)) return <Navigate to={path('')} replace />;
+  return <>{children}</>;
 }
 
 /** Builds links inside the current auction: path('/live') -> /a/<id>/live */

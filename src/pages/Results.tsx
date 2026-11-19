@@ -1,5 +1,7 @@
+import { Share2 } from 'lucide-react';
 import { useState } from 'react';
-import { PlayerAvatar, Segmented, TeamBadge } from '../components/ui';
+import { ShareCard, type CardTarget } from '../components/ShareCard';
+import { PlayerAvatar, Segmented, TeamBadge, Toast, useToast } from '../components/ui';
 import { exportResults } from '../lib/excel';
 import { money } from '../lib/format';
 import { categoryOf, teamStats } from '../lib/rules';
@@ -12,6 +14,8 @@ export function Results() {
   const { teams, settings, log, players } = state;
   const [view, setView] = useState<View>('squads');
   const [teamId, setTeamId] = useState(teams[0]?.id ?? '');
+  const [card, setCard] = useState<CardTarget | null>(null);
+  const [toast, showToast] = useToast();
   const team = teams.find((t) => t.id === teamId) ?? teams[0];
   const totalSpent = teams.reduce((sum, t) => sum + teamStats(state, t.id).spent, 0);
   const inSquads = players.filter((p) => p.status === 'sold' || p.status === 'retained').length;
@@ -81,6 +85,7 @@ export function Results() {
                 <span style={{ fontSize: 13, opacity: 0.9 }}>Owner: {team.owner || '—'} · {teamStats(state, team.id).count} players</span>
               </span>
               <span style={{ fontSize: 13 }}>{money(teamStats(state, team.id).purseLeft, settings.unit)} left</span>
+              <button className="btn btn-sm no-print" onClick={() => setCard({ kind: 'squad', team })}><Share2 size={15} />Share squad</button>
             </div>
             <table className="table">
               <tbody>
@@ -97,6 +102,9 @@ export function Results() {
                       </td>
                       <td className="muted">{p.role}</td>
                       <td className="num" style={{ textAlign: 'right' }}><strong>{money(p.price, settings.unit)}</strong></td>
+                      <td className="no-print" style={{ width: 44 }}>
+                        <button className="btn btn-ghost btn-sm btn-icon" aria-label={'Share ' + p.name + ' card'} title="Share player card" onClick={() => setCard({ kind: 'sold', player: p })}><Share2 size={15} /></button>
+                      </td>
                     </tr>
                   ))}
               </tbody>
@@ -111,7 +119,7 @@ export function Results() {
       {view === 'sold' && (
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>No.</th><th /><th>Player</th><th>Role</th><th>Category</th><th>Team</th><th>Price</th></tr></thead>
+            <thead><tr><th>No.</th><th /><th>Player</th><th>Role</th><th>Category</th><th>Team</th><th>Price</th><th className="no-print" /></tr></thead>
             <tbody>
               {players.filter((p) => p.status === 'sold').sort((a, b) => (b.price ?? 0) - (a.price ?? 0)).map((p) => (
                 <tr key={p.id}>
@@ -122,6 +130,9 @@ export function Results() {
                   <td>{categoryOf(state, p).name}</td>
                   <td>{teamName(p.teamId)}</td>
                   <td className="num"><strong>{money(p.price, settings.unit)}</strong></td>
+                  <td className="no-print" style={{ width: 44 }}>
+                    <button className="btn btn-ghost btn-sm btn-icon" aria-label={'Share ' + p.name + ' card'} title="Share SOLD card" onClick={() => setCard({ kind: 'sold', player: p })}><Share2 size={15} /></button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -168,6 +179,8 @@ export function Results() {
           {!log.length && <div className="empty">The auction log is empty.</div>}
         </div>
       )}
+      {card && <ShareCard state={state} target={card} onClose={() => setCard(null)} showToast={showToast} />}
+      <Toast msg={toast} />
     </main>
   );
 }

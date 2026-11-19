@@ -1,6 +1,7 @@
-import { ArrowRight, CalendarDays, Check, ClipboardList, Copy, Gavel, MapPin, MonitorPlay, Play, Settings2, Trophy, UserPlus, Users, UsersRound, Wallet } from 'lucide-react';
+import { ArrowRight, CalendarDays, Check, ClipboardList, Copy, Gavel, MapPin, MonitorPlay, Play, Radio, Settings2, Trophy, UserPlus, Users, UsersRound, Wallet } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { ProPrompt } from '../components/ProPrompt';
+import { RegistrationLinkRow } from '../components/RegistrationLink';
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../store/auth';
 import { useAuctionPath } from '../components/AuctionRoute';
@@ -8,7 +9,8 @@ import { ScreenLink, shareUrl } from '../components/ScreenLink';
 import { StatCard, Toast, copyText, useToast } from '../components/ui';
 import { sportOf } from '../data/sports';
 import { money } from '../lib/format';
-import { goOnline, overFreeLimit, useAppState, useCloudInfo } from '../store/store';
+import { areaOfPath, canOpen } from '../lib/roles';
+import { goOnline, overFreeLimit, useAppState, useCloudInfo, useRole } from '../store/store';
 
 function formatDate(value: string) {
   if (!value) return 'Date not set';
@@ -27,6 +29,7 @@ export function Overview() {
   const online = cloud.synced.includes(auctionId);
   const [proOpen, setProOpen] = useState(false);
   const [toast, showToast] = useToast();
+  const role = useRole();
 
   const needPlayers = teams.length * settings.minSquad;
   const steps: { done: boolean; title: string; text: string; to: string; cta: string; icon: ReactNode }[] = [
@@ -70,10 +73,11 @@ export function Overview() {
   const live = auction.status === 'live' || auction.status === 'paused';
   const sold = log.filter((l) => l.type !== 'unsold').length;
 
-  const links = [
+  const links: { label: string; hint: string; path: string; open?: string; icon: ReactNode; tone: string }[] = [
     { label: 'Live screen', hint: 'Open on the projector or TV', path: '/live', icon: <MonitorPlay size={18} />, tone: 'tone-blue' },
     { label: 'Player registration', hint: 'Players fill their own details', path: '/register', icon: <ClipboardList size={18} />, tone: 'tone-green' },
     { label: 'Team owner bidding', hint: 'Owners bid from their phones', path: '/owner', icon: <UsersRound size={18} />, tone: 'tone-orange' },
+    { label: 'YouTube overlay', hint: 'Add in OBS as a browser source, over the camera', path: '/overlay', open: '/overlay?bg=preview', icon: <Radio size={18} />, tone: 'tone-dark' },
   ];
 
   return (
@@ -89,7 +93,7 @@ export function Overview() {
         </div>
         <div className="row">
           <ScreenLink className="btn" to={path('/live')}><MonitorPlay size={16} />Live screen</ScreenLink>
-          {auction.status === 'finished' ? (
+          {auction.status === 'finished' || !canOpen(role, 'console') ? (
             <Link className="btn btn-primary btn-lg" to={path('/results')}><Trophy size={18} />View results</Link>
           ) : (
             <Link className={'btn btn-lg ' + (ready || live ? 'btn-accent' : 'btn-primary')} to={path('/console')}>
@@ -125,10 +129,12 @@ export function Overview() {
                   <strong>{s.title}</strong>
                   <span className="muted" style={{ fontSize: 13 }}>{s.text}</span>
                 </div>
-                <Link className={'btn btn-sm ' + (s.done ? 'btn-ghost' : 'btn-primary')} to={path(s.to)}>
-                  {s.cta}
-                  <ArrowRight size={14} />
-                </Link>
+                {canOpen(role, areaOfPath(s.to) ?? 'results') && (
+                  <Link className={'btn btn-sm ' + (s.done ? 'btn-ghost' : 'btn-primary')} to={path(s.to)}>
+                    {s.cta}
+                    <ArrowRight size={14} />
+                  </Link>
+                )}
               </div>
             ))}
           </div>
@@ -152,7 +158,7 @@ export function Overview() {
               )}
             </div>
           )}
-          {links.map((l) => (
+          {links.map((l) => l.path === '/register' ? <RegistrationLinkRow key={l.path} showToast={showToast} /> : (
             <div key={l.path} className="row" style={{ flexWrap: 'nowrap', gap: 12, paddingTop: 12, borderTop: '1px solid var(--line-2)' }}>
               <span className={'stat-icon ' + l.tone} style={{ width: 38, height: 38 }}>{l.icon}</span>
               <span style={{ flexGrow: 1, minWidth: 0 }}>
@@ -162,7 +168,7 @@ export function Overview() {
               <button className="btn btn-sm btn-icon" aria-label={'Copy ' + l.label + ' link'} title="Copy link" onClick={() => copyText(shareUrl(path(l.path)), showToast, l.label + ' link copied')}>
                 <Copy size={15} />
               </button>
-              <ScreenLink className="btn btn-sm" to={path(l.path)}>Open</ScreenLink>
+              <ScreenLink className="btn btn-sm" to={path(l.open ?? l.path)}>{l.open ? 'Preview' : 'Open'}</ScreenLink>
             </div>
           ))}
           <Link className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start' }} to={path('/settings?tab=screen')}>

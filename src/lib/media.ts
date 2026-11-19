@@ -1,5 +1,5 @@
 /** Shrinks a photo so it fits comfortably in browser storage (~15 KB). */
-export function resizeImage(file: File, size = 240): Promise<string> {
+export function resizeImage(file: File, size = 240, background?: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
@@ -7,7 +7,13 @@ export function resizeImage(file: File, size = 240): Promise<string> {
       const canvas = document.createElement('canvas');
       canvas.width = Math.round(img.width * Math.min(1, scale));
       canvas.height = Math.round(img.height * Math.min(1, scale));
-      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const g = canvas.getContext('2d')!;
+      if (background) {
+        // Logos with a see-through background would turn black as a JPEG.
+        g.fillStyle = background;
+        g.fillRect(0, 0, canvas.width, canvas.height);
+      }
+      g.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(img.src);
       resolve(canvas.toDataURL('image/jpeg', 0.8));
     };

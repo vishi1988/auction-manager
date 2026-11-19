@@ -2,11 +2,12 @@
 // Firestore allows 1 MB per record, and a bid should not re-send every photo.
 import type { AppState } from '../types';
 
-/** Photo id -> image data. Ids look like "player-p_abc" or "team-t_xyz". */
+/** Photo id -> image data. Ids look like "player-p_abc", "team-t_xyz" or "sponsor-s_abc". */
 export type PhotoMap = Record<string, string>;
 
 const playerKey = (id: string) => 'player-' + id;
 const teamKey = (id: string) => 'team-' + id;
+const sponsorKey = (id: string) => 'sponsor-' + id;
 
 /** Splits an auction into its data without images, and the images on their own. */
 export function splitPhotos(state: AppState): { lean: AppState; photos: PhotoMap } {
@@ -25,6 +26,16 @@ export function splitPhotos(state: AppState): { lean: AppState; photos: PhotoMap
       const { logo: _logo, ...rest } = t;
       return rest;
     }),
+    ...(state.sponsors
+      ? {
+          sponsors: state.sponsors.map((s) => {
+            if (!s.logo) return s;
+            photos[sponsorKey(s.id)] = s.logo;
+            const { logo: _logo, ...rest } = s;
+            return rest;
+          }),
+        }
+      : {}),
   };
   return { lean, photos };
 }
@@ -35,6 +46,7 @@ export function mergePhotos(lean: AppState, photos: PhotoMap): AppState {
     ...lean,
     players: lean.players.map((p) => (photos[playerKey(p.id)] ? { ...p, photo: photos[playerKey(p.id)] } : p)),
     teams: lean.teams.map((t) => (photos[teamKey(t.id)] ? { ...t, logo: photos[teamKey(t.id)] } : t)),
+    ...(lean.sponsors ? { sponsors: lean.sponsors.map((s) => (photos[sponsorKey(s.id)] ? { ...s, logo: photos[sponsorKey(s.id)] } : s)) } : {}),
   };
 }
 

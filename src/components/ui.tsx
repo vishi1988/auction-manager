@@ -1,5 +1,6 @@
 import { CheckCircle2, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { initials } from '../lib/format';
 import type { Player, Team } from '../types';
 
@@ -97,13 +98,18 @@ export function useToast(): [string | null, (msg: string) => void] {
   return [msg, setMsg];
 }
 
+// Panels and messages that must cover the whole screen are drawn straight on
+// <body>, so a page that is short (few entries) or still animating cannot shrink them.
 export const Toast = ({ msg }: { msg: string | null }) =>
-  msg ? (
-    <div className="toast" role="status" key={msg}>
-      <CheckCircle2 size={18} color="#4ade80" aria-hidden />
-      {msg}
-    </div>
-  ) : null;
+  msg
+    ? createPortal(
+        <div className="toast" role="status" key={msg}>
+          <CheckCircle2 size={18} color="#4ade80" aria-hidden />
+          {msg}
+        </div>,
+        document.body,
+      )
+    : null;
 
 /** Side panel for forms, so pages stay uncluttered. Closes on Escape or backdrop click. */
 export function Drawer({ title, onClose, children, footer }: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
@@ -117,7 +123,7 @@ export function Drawer({ title, onClose, children, footer }: { title: string; on
       document.body.style.overflow = prev;
     };
   }, [onClose]);
-  return (
+  return createPortal(
     <>
       <div className="drawer-scrim" onClick={onClose} />
       <div className="drawer" role="dialog" aria-modal="true" aria-label={title}>
@@ -130,7 +136,8 @@ export function Drawer({ title, onClose, children, footer }: { title: string; on
         <div className="drawer-body">{children}</div>
         {footer && <div className="drawer-foot">{footer}</div>}
       </div>
-    </>
+    </>,
+    document.body,
   );
 }
 

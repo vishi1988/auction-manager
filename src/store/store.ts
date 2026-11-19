@@ -1,11 +1,11 @@
-import { useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { createDummyState, migrateState } from '../data/dummy';
 import { joinDraw, placeBid, resetAuction, type BidResult } from '../lib/auction';
 import { playerFromRegistration, sameMobile } from '../lib/registration';
-import type { AppState, AuctionMeta, Registration } from '../types';
+import type { AccessRole, AppState, AuctionMeta, Registration } from '../types';
 import { createLocalBackend, takeLegacyState, type IndexData, type SyncBackend } from './backend';
 import { FREE_MAX_TEAMS, getAuth, onUserChange, teamLimitReached } from './auth';
-import type { BidOutcome, Cloud, CloudStatus, PendingBid, RemoteAuction } from './cloud';
+import type { BidOutcome, Cloud, CloudStatus, Member, MemberList, PendingBid, RemoteAuction } from './cloud';
 import { API_BASE, CLOUD } from './cloudConfig';
 
 const backend: SyncBackend = createLocalBackend();
@@ -198,6 +198,7 @@ async function syncAccount() {
     return;
   }
   const online = new Set(remote.map((a) => a.id));
+  for (const a of remote) if (a.role && a.role !== 'owner') roles[a.id] = a.role;
   const unsent = new Set(dirty);
   for (const a of index.auctions) {
     if (localOnlyIds.includes(a.id)) continue;
@@ -208,11 +209,34 @@ async function syncAccount() {
   dirty = [];
   saveList(DIRTY_KEY, dirty);
   const missing = remote.filter((a) => !index.auctions.some((x) => x.id === a.id));
-  if (missing.length) {
+  // Auctions shared with this account carry the role it was given; ones it lost access to disappear.
+  const sharedRole = (r?: AccessRole) => (r && r !== 'owner' ? r : undefined);
+  const roleChanged = remote.some((a) => {
+    const m = index.auctions.find((x) => x.id === a.id);
+    return m && sharedRole(a.role) !== m.role;
+  });
+  const lost = index.auctions.filter((a) => a.role && !online.has(a.id));
+  if (missing.length || roleChanged || lost.length) {
     updateIndex((d) => {
-      d.auctions.push(...missing);
+      for (const a of remote) {
+        const m = d.auctions.find((x) => x.id === a.id);
+        if (!m) continue;
+        const r = sharedRole(a.role);
+        if (r) m.role = r;
+        else delete m.role;
+      }
+      d.auctions = d.auctions.filter((a) => !a.role || online.has(a.id));
+      d.auctions.push(...missing.map((a) => ({ ...a, role: sharedRole(a.role) })));
       d.auctions.sort((a, b) => b.createdAt - a.createdAt);
     });
+  }
+  for (const a of lost) {
+    backend.removeAuction(a.id);
+    if (a.id in synced) {
+      const rest = { ...synced };
+      delete rest[a.id];
+      setSynced(rest);
+    }
   }
   refreshCloudInfo();
 }
@@ -237,6 +261,7 @@ function pushToCloud(id: string, s: AppState) {
   if (overFreeLimit(s) && !(id in synced)) return;
   const at = Date.now();
   const isNew = !(id in synced);
+  awaitingSave.add(id);
   setSynced({ ...synced, [id]: at });
   const token = tokenFor(id);
   void cloudReady.then((c) => c.saveAuction(id, s, at, token), () => {});
@@ -319,8 +344,17 @@ export function duplicateAuction(id: string): string | null {
   return createAuction(copy);
 }
 
+/** Owners delete the auction for everyone; an invited member only leaves it. */
 export function deleteAuction(id: string) {
-  dropFromCloud(id);
+  if (roleOf(id) === 'owner') dropFromCloud(id);
+  else {
+    void cloudReady?.then((c) => c.leaveAuction(id)).catch((err) => console.warn('Leave auction', err));
+    if (id in synced) {
+      const rest = { ...synced };
+      delete rest[id];
+      setSynced(rest);
+    }
+  }
   backend.removeAuction(id);
   updateIndex((d) => void (d.auctions = d.auctions.filter((a) => a.id !== id)));
 }
@@ -425,8 +459,120 @@ export function openAuction(id: string): boolean {
   return state !== null;
 }
 
+// ---------- who is who: roles, and changes made by other admins ----------
+
+/** What this account is to each auction it has seen online (own auctions are 'owner'). */
+const roles: Record<string, AccessRole> = {};
+/** Newest server version of each auction this device has either saved or downloaded. */
+const seen: Record<string, number> = {};
+/** Auctions with a save on its way to the server. */
+const awaitingSave = new Set<string>();
+let myClient = '';
+let conflictAt = 0;
+
+void cloudReady?.then(
+  (c) => {
+    myClient = c.clientId;
+    c.onSaved((id, version) => {
+      seen[id] = Math.max(seen[id] ?? 0, version);
+      awaitingSave.delete(id);
+    });
+    c.onConflict((id) => {
+      awaitingSave.delete(id);
+      if (id !== currentId) return;
+      conflictAt = Date.now();
+      emit();
+    });
+  },
+  () => {},
+);
+
+/** Readable registration link name of each online auction (khiladiauction.com/register/<slug>). */
+const slugs: Record<string, string> = {};
+
+/** The readable name of the open auction's registration link, or '' when it has none (yet). */
+export function useRegisterSlug(): string {
+  return useSyncExternalStore(
+    (l) => (listeners.add(l), () => listeners.delete(l)),
+    () => (currentId ? slugs[currentId] ?? '' : ''),
+  );
+}
+
+/** Gives the open auction's registration link a readable name. Rejects with 'slug_taken', 'bad_slug', … */
+export async function setRegisterSlug(slug: string): Promise<void> {
+  const id = currentId ?? '';
+  const saved = await (await readyCloud()).setSlug(id, slug);
+  slugs[id] = saved;
+  emit();
+}
+
+/** The role of this account in an auction; 'owner' unless the server said otherwise. */
+function roleOf(id: string): AccessRole {
+  return roles[id] ?? index.auctions.find((a) => a.id === id)?.role ?? 'owner';
+}
+
+function setRole(id: string, role: AccessRole) {
+  if (roles[id] === role) return;
+  roles[id] = role;
+  const shown = role === 'owner' ? undefined : role;
+  const meta = index.auctions.find((a) => a.id === id);
+  if (meta && meta.role !== shown) {
+    updateIndex((d) => {
+      const m = d.auctions.find((a) => a.id === id);
+      if (!m) return;
+      if (shown) m.role = shown;
+      else delete m.role;
+    });
+  }
+  if (id === currentId) emit();
+}
+
+/** What this account is in the open auction: its owner, an invited admin / auctioneer / data-entry helper, or null when only watching. */
+export function useRole(): AccessRole | null {
+  return useSyncExternalStore(
+    (l) => (listeners.add(l), () => listeners.delete(l)),
+    () => (currentId && !viewOnly ? roleOf(currentId) : null),
+  );
+}
+
+/** True for a few seconds after another admin's save won over this device's last change. */
+export function useConflictNotice(): boolean {
+  const at = useSyncExternalStore(
+    (l) => (listeners.add(l), () => listeners.delete(l)),
+    () => conflictAt,
+  );
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!at) return;
+    const t = setTimeout(() => tick((n) => n + 1), 10000);
+    return () => clearTimeout(t);
+  }, [at]);
+  return at > 0 && Date.now() - at < 10000;
+}
+
+async function readyCloud(): Promise<Cloud> {
+  const c = await cloudReady?.catch(() => null);
+  if (!c) throw new Error('offline');
+  return c;
+}
+
+/** The people the open auction is shared with. */
+export async function listMembers(): Promise<MemberList> {
+  return (await readyCloud()).listMembers(currentId ?? '');
+}
+export async function inviteMember(email: string, role: Member['role']): Promise<void> {
+  return (await readyCloud()).inviteMember(currentId ?? '', email, role);
+}
+export async function removeMember(email: string): Promise<void> {
+  return (await readyCloud()).removeMember(currentId ?? '', email);
+}
+
 function onRemote(id: string, remote: RemoteAuction | null) {
   if (id !== currentId) return;
+  if (remote && slugs[id] !== remote.slug) {
+    slugs[id] = remote.slug;
+    emit();
+  }
   if (!remote) {
     // Not in the cloud. Whatever is already on screen stays usable.
     if (!state) {
@@ -436,9 +582,14 @@ function onRemote(id: string, remote: RemoteAuction | null) {
     return;
   }
   if (remote.mine) {
+    if (remote.role) setRole(id, remote.role);
+    // Another admin (a different device) saved a newer version: theirs is the latest, take it.
+    const newer = remote.version > (seen[id] ?? 0);
+    seen[id] = Math.max(seen[id] ?? 0, remote.version);
+    const fromOtherDevice = newer && !!remote.by && !!myClient && remote.by !== myClient && !awaitingSave.has(id);
     // This browser runs the auction, so its copy wins unless the cloud has
     // something newer or this browser has lost its copy.
-    if (state && remote.updatedAt <= (synced[id] ?? 0)) {
+    if (state && !fromOtherDevice && remote.updatedAt <= (synced[id] ?? 0)) {
       // A change made here that never reached the server (closed while offline): send it now.
       if (remote.updatedAt < (synced[id] ?? 0) && !viewOnly) pushToCloud(id, state);
       return;
@@ -612,7 +763,7 @@ function persist(next: AppState) {
   if (!meta || (['name', 'sport', 'date', 'venue', 'teams', 'players', 'status'] as const).some((k) => meta[k] !== fresh[k])) {
     updateIndex((d) => {
       const i = d.auctions.findIndex((a) => a.id === id);
-      if (i >= 0) d.auctions[i] = fresh;
+      if (i >= 0) d.auctions[i] = d.auctions[i]!.role ? { ...fresh, role: d.auctions[i]!.role } : fresh;
     });
   }
   emit();

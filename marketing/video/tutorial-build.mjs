@@ -41,29 +41,41 @@ const shoot = async (html, file, { dsf = 1.5, transparent = false } = {}) => {
   await new Promise((r) => setTimeout(r, 300));
   await page.screenshot({ path: file, omitBackground: transparent });
 };
-const font = `font-family:'Segoe UI',Arial,sans-serif`;
+const font = `font-family:'Segoe UI','Nirmala UI',Arial,sans-serif`;
+// Words on the title cards; a script in another language gives its own under "ui".
+const ui = {
+  tagline: 'Free player auction software for local leagues',
+  pill: 'Full tutorial · from setup to SOLD',
+  outroTop: 'Create your first auction — free',
+  sports: 'Cricket · Kabaddi · Volleyball · Football · Badminton and more',
+  outroPill: 'Try it free · 2 teams',
+  playerPhone: 'On the player’s phone',
+  ownerPhone: 'On the team owner’s phone',
+  phone: 'On the phone',
+  ...(script.ui ?? {}),
+};
 const bg = 'background:radial-gradient(1200px 700px at 70% 20%,#1c2f5e 0%,#0b1220 60%)';
 
 const cards = {
   intro: `<body style="margin:0;width:1920px;height:1080px;${bg};${font};color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px">
     <div style="width:150px;height:150px;border-radius:36px;background:#ff7a1a;display:grid;place-items:center;font-size:72px;font-weight:800;box-shadow:0 20px 60px rgba(255,122,26,.45)">KH</div>
     <div style="font-size:112px;font-weight:800;letter-spacing:-2px">KhiladiAuction</div>
-    <div style="font-size:44px;color:#c3cddc">Free player auction software for local leagues</div>
-    <div style="margin-top:18px;padding:14px 34px;border-radius:999px;background:rgba(255,255,255,.1);font-size:34px;font-weight:600">Full tutorial · from setup to SOLD</div></body>`,
+    <div style="font-size:44px;color:#c3cddc">${ui.tagline}</div>
+    <div style="margin-top:18px;padding:14px 34px;border-radius:999px;background:rgba(255,255,255,.1);font-size:34px;font-weight:600">${ui.pill}</div></body>`,
   outro: `<body style="margin:0;width:1920px;height:1080px;${bg};${font};color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px">
-    <div style="font-size:60px;font-weight:700;color:#c3cddc">Create your first auction — free</div>
+    <div style="font-size:60px;font-weight:700;color:#c3cddc">${ui.outroTop}</div>
     <div style="font-size:150px;font-weight:800;color:#ff9a4a;letter-spacing:-3px">khiladiauction.com</div>
-    <div style="font-size:40px;color:#c3cddc">Cricket · Kabaddi · Volleyball · Football · Badminton and more</div>
-    <div style="margin-top:20px;padding:16px 40px;border-radius:999px;background:#ff7a1a;font-size:40px;font-weight:700">Try it free · 2 teams</div></body>`,
+    <div style="font-size:40px;color:#c3cddc">${ui.sports}</div>
+    <div style="margin-top:20px;padding:16px 40px;border-radius:999px;background:#ff7a1a;font-size:40px;font-weight:700">${ui.outroPill}</div></body>`,
 };
 for (const [k, html] of Object.entries(cards)) await shoot(html, join(W, 'card_' + k + '.png'));
 
 const phoneImages = Object.entries(meta).filter(([, v]) => v && v.vp === 'phone').map(([k]) => k);
-const phoneLabel = { s10_register: 'On the player’s phone', s10b_register: 'On the player’s phone', s16_owner: 'On the team owner’s phone' };
+const phoneLabel = { s10_register: ui.playerPhone, s10b_register: ui.playerPhone, s16_owner: ui.ownerPhone };
 for (const name of phoneImages) {
   const src = pathToFileURL(resolve(shotsDir, name + '.png')).href;
   await shoot(`<body style="margin:0;width:1920px;height:1080px;${bg};${font};color:#fff;display:flex;align-items:center;justify-content:center;gap:90px">
-    <div style="font-size:64px;font-weight:800;max-width:520px;line-height:1.1">${phoneLabel[name] ?? 'On the phone'}</div>
+    <div style="font-size:64px;font-weight:800;max-width:520px;line-height:1.1">${phoneLabel[name] ?? ui.phone}</div>
     <div style="height:960px;aspect-ratio:390/780;border-radius:64px;border:16px solid #05080f;overflow:hidden;box-shadow:0 40px 100px rgba(0,0,0,.6);background:#000"><img src="${src}" style="width:100%;height:100%;object-fit:cover;object-position:top"></div></body>`, join(W, 'stage_' + name + '.png'));
 }
 const captions = {};

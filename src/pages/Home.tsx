@@ -1,4 +1,5 @@
-import { CalendarDays, CheckCircle2, Copy, Gavel, LayoutGrid, MapPin, MonitorPlay, Plus, Radio, Search, Settings2, Sparkles, Trash2, Trophy, Users } from 'lucide-react';
+import { ROLE_LABEL, canOpen } from '../lib/roles';
+import { CalendarDays, CheckCircle2, Copy, Gavel, LayoutGrid, LogOut, MapPin, MonitorPlay, Plus, Radio, Search, Settings2, Sparkles, Trash2, Trophy, Users } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { GoogleButton } from '../components/GoogleSignIn';
@@ -154,6 +155,7 @@ function AuctionCard({ a }: { a: AuctionMeta }) {
         <div className="row" style={{ gap: 8 }}>
           <span className="pill" style={{ background: color + '1a', color }}>{sportOf(a.sport).name}</span>
           {status}
+          {a.role && <span className="pill pill-orange" title="Shared with you">{ROLE_LABEL[a.role]}</span>}
         </div>
         <Link to={base} style={{ color: 'inherit', textDecoration: 'none' }}>
           <h3 style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.25, letterSpacing: '-0.01em' }}>{a.name}</h3>
@@ -167,29 +169,37 @@ function AuctionCard({ a }: { a: AuctionMeta }) {
           <span className="row" style={{ gap: 6, fontSize: 13 }}><Gavel size={15} color="var(--muted)" /><b>{a.players}</b> players</span>
         </div>
         <div className="row" style={{ marginTop: 'auto', paddingTop: 12, borderTop: '1px solid var(--line-2)', gap: 6, flexWrap: 'nowrap' }}>
-          <Link className={'btn btn-sm ' + (live ? 'btn-accent' : 'btn-primary')} to={base + (live ? '/console' : a.status === 'finished' ? '/results' : '')}>
-            {live ? 'Go to console' : a.status === 'finished' ? 'View results' : 'Open'}
+          <Link className={'btn btn-sm ' + (live && canOpen(a.role ?? 'owner', 'console') ? 'btn-accent' : 'btn-primary')} to={base + (live && canOpen(a.role ?? 'owner', 'console') ? '/console' : a.status === 'finished' ? '/results' : '')}>
+            {live && canOpen(a.role ?? 'owner', 'console') ? 'Go to console' : a.status === 'finished' ? 'View results' : 'Open'}
           </Link>
           <ScreenLink className="btn btn-sm btn-icon" to={base + '/live'} aria-label="Open live screen" title="Live screen"><MonitorPlay size={15} /></ScreenLink>
           <span className="spacer" />
+          {(!a.role || a.role === 'admin') && (
+            <button
+              className="btn btn-ghost btn-sm btn-icon"
+              title="Make a copy with the same teams, players and rules"
+              aria-label={'Copy ' + a.name}
+              onClick={() => {
+                const id = duplicateAuction(a.id);
+                if (id) navigate('/a/' + id);
+              }}
+            >
+              <Copy size={15} />
+            </button>
+          )}
           <button
             className="btn btn-ghost btn-sm btn-icon"
-            title="Make a copy with the same teams, players and rules"
-            aria-label={'Copy ' + a.name}
-            onClick={() => {
-              const id = duplicateAuction(a.id);
-              if (id) navigate('/a/' + id);
-            }}
+            title={a.role ? 'Leave this auction' : 'Delete auction'}
+            aria-label={(a.role ? 'Leave ' : 'Delete ') + a.name}
+            onClick={() =>
+              confirm(
+                a.role
+                  ? `Leave "${a.name}"? You will lose access until the owner invites you again. The auction itself stays.`
+                  : `Delete "${a.name}" and all its teams, players and results? This cannot be undone.`,
+              ) && deleteAuction(a.id)
+            }
           >
-            <Copy size={15} />
-          </button>
-          <button
-            className="btn btn-ghost btn-sm btn-icon"
-            title="Delete auction"
-            aria-label={'Delete ' + a.name}
-            onClick={() => confirm(`Delete "${a.name}" and all its teams, players and results? This cannot be undone.`) && deleteAuction(a.id)}
-          >
-            <Trash2 size={15} />
+            {a.role ? <LogOut size={15} /> : <Trash2 size={15} />}
           </button>
         </div>
       </div>

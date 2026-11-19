@@ -4,6 +4,7 @@ import { Celebration } from '../components/live/Celebration';
 import { FortuneWheel } from '../components/live/FortuneWheel';
 import { CountUpText, LivePhoto, MaskText, cssVars } from '../components/live/Motion';
 import { Odometer } from '../components/live/Odometer';
+import { SponsorChip, shownSponsors } from '../components/SponsorsEditor';
 import { TeamBadge, useCountdown } from '../components/ui';
 import { initials, money, r2 } from '../lib/format';
 import { sounds } from '../lib/media';
@@ -25,6 +26,7 @@ export function Live() {
   const buyer = isSold ? teams.find((t) => t.id === player?.teamId) : undefined;
   const pool = state.players.filter((p) => p.status !== 'retained' && p.status !== 'hold').length;
   const cat = player ? categoryOf(state, player) : null;
+  const sponsors = shownSponsors(state.sponsors);
 
   // Sounds follow the console's actions.
   const lastEvent = useRef(e);
@@ -90,6 +92,15 @@ export function Live() {
           ))}
         </aside>
       </main>
+
+      {sponsors.length > 0 && (
+        <div className="sponsor-bar" aria-label="Sponsors">
+          <span className="sponsor-bar-label">{sponsors.length === 1 ? 'SPONSOR' : 'SPONSORS'}</span>
+          <span className="sponsor-bar-list">
+            {sponsors.map((s) => <SponsorChip key={s.id} sponsor={s} />)}
+          </span>
+        </div>
+      )}
 
       <Ticker state={state} />
 

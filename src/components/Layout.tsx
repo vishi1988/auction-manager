@@ -4,12 +4,13 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { APP_NAME, APP_TAGLINE } from '../brand';
 import { sportOf } from '../data/sports';
 import { useAuth } from '../store/auth';
-import { useAppState, useAuctionStatus, useCloudInfo } from '../store/store';
+import { canOpen, ROLE_LABEL } from '../lib/roles';
+import { useAppState, useAuctionStatus, useCloudInfo, useConflictNotice, useRole } from '../store/store';
 import { UserChip } from './GoogleSignIn';
 import { useAuctionPath } from './AuctionRoute';
 import { ScreenLink } from './ScreenLink';
 
-function Shell({ sidebar, title }: { sidebar: ReactNode; title: string }) {
+function Shell({ sidebar, title, notice }: { sidebar: ReactNode; title: string; notice?: ReactNode }) {
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
   useEffect(() => setOpen(false), [pathname]);
@@ -37,6 +38,7 @@ function Shell({ sidebar, title }: { sidebar: ReactNode; title: string }) {
           </button>
           <span className="title">{title}</span>
         </header>
+        {notice}
         <Outlet />
       </div>
     </div>
@@ -82,6 +84,8 @@ export function AuctionLayout() {
   const { settings, auction, teams, players } = useAppState();
   const path = useAuctionPath();
   const viewOnly = useAuctionStatus() === 'view-only';
+  const role = useRole();
+  const conflict = useConflictNotice();
   const detailsDone = !!settings.name && !!settings.date;
   const teamsDone = teams.length >= 2;
   const playersDone = teams.length > 0 && players.length >= teams.length * settings.minSquad;
@@ -94,6 +98,13 @@ export function AuctionLayout() {
   return (
     <Shell
       title={settings.name}
+      notice={
+        conflict && (
+          <div role="alert" className="conflict-notice">
+            <strong>Another admin changed this auction at the same moment.</strong> Your last change was not saved, and the latest version is shown now. Please do it again.
+          </div>
+        )
+      }
       sidebar={
         <>
           <div className="auction-switch">
@@ -102,21 +113,25 @@ export function AuctionLayout() {
             <span className="row" style={{ gap: 6 }}>
               <span className="pill pill-blue">{sportOf(settings.sport).name}</span>
               {statusPill}
+              {role && role !== 'owner' && <span className="pill pill-orange">You: {ROLE_LABEL[role]}</span>}
             </span>
-            {viewOnly && <span className="hint">View only: this auction is run from another device, so changes made here are not saved.</span>}
+            {viewOnly &&<span className="hint">View only: this auction is run from another device, so changes made here are not saved.</span>}
           </div>
           <NavLink to={path('')} end className="nav-item"><LayoutDashboard size={18} />Overview</NavLink>
 
           <div className="nav-label">Setup</div>
-          <NavLink to={path('/settings')} className="nav-item"><Step n={1} done={detailsDone} />Details &amp; rules<Settings2 size={15} style={{ marginLeft: 'auto', opacity: 0.5 }} /></NavLink>
-          <NavLink to={path('/teams')} className="nav-item"><Step n={2} done={teamsDone} />Teams<span className="count">{teams.length}</span></NavLink>
-          <NavLink to={path('/players')} className="nav-item"><Step n={3} done={playersDone} />Players<span className="count">{players.length}</span></NavLink>
+          {canOpen(role, 'settings') && <NavLink to={path('/settings')} className="nav-item"><Step n={1} done={detailsDone} />Details &amp; rules<Settings2 size={15} style={{ marginLeft: 'auto', opacity: 0.5 }} /></NavLink>}
+          {canOpen(role, 'teams') && <NavLink to={path('/teams')} className="nav-item"><Step n={2} done={teamsDone} />Teams<span className="count">{teams.length}</span></NavLink>}
+          {canOpen(role, 'players') && <NavLink to={path('/players')} className="nav-item"><Step n={3} done={playersDone} />Players<span className="count">{players.length}</span></NavLink>}
+          <NavLink to={path('/team')} className="nav-item"><ShieldCheck size={18} />Auction team</NavLink>
 
           <div className="nav-label">Auction day</div>
-          <NavLink to={path('/console')} className="nav-item">
-            <Gavel size={18} />Auction console
-            {live && <span className="count" style={{ background: '#ef4444', color: '#fff' }}>LIVE</span>}
-          </NavLink>
+          {canOpen(role, 'console') && (
+            <NavLink to={path('/console')} className="nav-item">
+              <Gavel size={18} />Auction console
+              {live && <span className="count" style={{ background: '#ef4444', color: '#fff' }}>LIVE</span>}
+            </NavLink>
+          )}
           <ScreenLink to={path('/live')} className="nav-item"><MonitorPlay size={18} />Live screen ↗</ScreenLink>
           <ScreenLink to={path('/owner')} className="nav-item"><UsersRound size={18} />Owner bidding ↗</ScreenLink>
 

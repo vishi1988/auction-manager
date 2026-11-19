@@ -9,7 +9,7 @@ export const SITE = {
   brand: 'KhiladiAuction',
 
   /** WhatsApp / phone with country code, e.g. '+91 98765 43210'. */
-  whatsapp: '',
+  whatsapp: '+91 97731 67110',
   /** Contact email, e.g. 'hello@khiladiauction.com' (create it in Hostinger -> Emails). */
   email: '',
   /** City or region you serve, e.g. 'Pune, Maharashtra'. */

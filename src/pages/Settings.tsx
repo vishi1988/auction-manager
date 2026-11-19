@@ -1,6 +1,7 @@
 import { Database, Gavel, Info, Layers, MonitorPlay, Plus, SlidersHorizontal, Trash2, Wallet } from 'lucide-react';
 import { useRef, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { SponsorsEditor } from '../components/SponsorsEditor';
 import { OptionRow, Segmented, Switch, Tabs, Toast, useToast } from '../components/ui';
 import { createDummyState } from '../data/dummy';
 import { SPORTS } from '../data/sports';
@@ -328,6 +329,9 @@ export function Settings() {
                   </select>
                 </label>
               </div>
+            </Section>
+            <Section title="Sponsors" text="Shown on the live screen, the streaming overlay and the pictures you share on WhatsApp. Add a logo, or just the name.">
+              <SponsorsEditor sponsors={state.sponsors ?? []} />
             </Section>
             <Section title="Sound" text="Played on the live screen after you click “Turn on sound” there.">
               <OptionRow title="Sound effects" control={<Switch label="Sound" checked={settings.sound} onChange={(v) => set('sound', v)} />}>

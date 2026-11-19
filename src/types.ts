@@ -79,6 +79,13 @@ export interface Team {
   ownerKey?: string;
 }
 
+/** A sponsor shown on the live screen, the streaming overlay and share cards. */
+export interface Sponsor {
+  id: string;
+  name: string;
+  logo?: string;
+}
+
 /** A T-shirt ordered on top of the player's own: a second one for the player, or one for someone who is not playing. */
 export interface ExtraTshirt {
   who: 'player' | 'other';
@@ -190,6 +197,9 @@ export interface Organizer {
 }
 
 /** Summary of one auction, shown on the "My Auctions" page without loading all its data. */
+/** What a person is to an auction: the owner, or someone the owner invited (see members.php). */
+export type AccessRole = 'owner' | 'admin' | 'auctioneer' | 'data';
+
 export interface AuctionMeta {
   id: string;
   name: string;
@@ -201,6 +211,8 @@ export interface AuctionMeta {
   status: AuctionState['status'];
   createdAt: number;
   updatedAt: number;
+  /** Only for auctions shared with this account; own auctions leave it out. */
+  role?: AccessRole;
 }
 
 export interface AppState {
@@ -211,4 +223,6 @@ export interface AppState {
   players: Player[];
   auction: AuctionState;
   log: LogEntry[];
+  /** Sponsors of the tournament, in the order they are shown. */
+  sponsors?: Sponsor[];
 }

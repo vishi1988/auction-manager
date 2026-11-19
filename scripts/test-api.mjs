@@ -113,10 +113,11 @@ await check('data that is not an auction is refused', async () => {
 });
 await check('photos: owner adds, anyone reads, version goes up', async () => {
   const img = 'data:image/jpeg;base64,' + Buffer.from('fake').toString('base64');
-  r = await call(`/photos.php?id=${id}`, { method: 'POST', user: A, body: { put: { 'player-p1': img, 'team-t1': img }, remove: [] } });
+  r = await call(`/photos.php?id=${id}`, { method: 'POST', user: A, body: { put: { 'player-p1': img, 'team-t1': img, 'sponsor-s_1': img }, remove: [] } });
   assert.equal(r.status, 200);
   const got = await json(await call(`/photos.php?id=${id}`));
   assert.equal(got.photos['player-p1'], img);
+  assert.equal(got.photos['sponsor-s_1'], img);
   assert.equal((await json(await call(`/auction.php?id=${id}`))).photosVersion, 1);
 });
 await check('photos: others and signed-out browsers cannot change them; bad data refused', async () => {
@@ -127,7 +128,7 @@ await check('photos: others and signed-out browsers cannot change them; bad data
 });
 await check('photos: remove works', async () => {
   await call(`/photos.php?id=${id}`, { method: 'POST', user: A, body: { put: {}, remove: ['team-t1'] } });
-  assert.deepEqual(Object.keys((await json(await call(`/photos.php?id=${id}`))).photos), ['player-p1']);
+  assert.deepEqual(Object.keys((await json(await call(`/photos.php?id=${id}`))).photos).sort(), ['player-p1', 'sponsor-s_1']);
 });
 await check('my-auctions lists only your own, with summary details', async () => {
   const a = await json(await call('/my-auctions.php', { user: A }));
@@ -193,6 +194,181 @@ await check('registration: collected forms are cleared by the account only; clos
   r = await call(`/register.php?id=${id}`, { method: 'POST', body: { player: { name: 'Late', mobile: '9876500009', role: 'Bowler' } } });
   assert.equal(r.status, 403);
   assert.equal((await r.json()).error, 'closed');
+});
+await check('sharing: owner invites by email; roles decide what each person may do', async () => {
+  const mk = (n, name) => {
+    const sub = n + Date.now();
+    return { sub, email: sub + '@example.com', cookie: helper('user', sub, name) };
+  };
+  const adm = mk('5', 'Admin Anil');
+  const auc = mk('6', 'Auctioneer Asha');
+  const dat = mk('7', 'Data Dev');
+  const out = mk('8', 'Outsider Om');
+  const invite = (user, email, role) => call(`/members.php?id=${id}`, { method: 'POST', user, body: { email, role } });
+  const me = async (u) => json(await call(`/auction.php?id=${id}`, { user: u.cookie ?? u }));
+
+  // Nobody invited yet: strangers see nothing private and cannot list members.
+  assert.equal((await call(`/members.php?id=${id}`, { user: adm.cookie })).status, 403);
+  assert.equal((await call(`/members.php?id=${id}`)).status, 401);
+  assert.equal((await me(adm)).role, null);
+  assert.equal((await me(A)).role, 'owner');
+  assert.equal((await me(A)).shared, false);
+
+  // Only the owner can start; bad input is refused.
+  assert.equal((await invite(adm.cookie, auc.email, 'auctioneer')).status, 403);
+  assert.equal((await invite(A, 'not-an-email', 'data')).status, 400);
+  assert.equal((await invite(A, adm.email, 'boss')).status, 400);
+  const ownerEmail = (await json(await call('/session.php', { user: A }))).user.email;
+  assert.equal((await invite(A, ownerEmail, 'data')).status, 400);
+  assert.equal((await invite(A, adm.email.toUpperCase(), 'admin')).status, 200);
+
+  // The admin (matched by email, any letter case) now edits like the owner.
+  const seen = await me(adm);
+  assert.equal(seen.mine, true);
+  assert.equal(seen.role, 'admin');
+  assert.equal(seen.shared, true);
+  assert.deepEqual(seen.data, (await me(A)).data); // the same private data the owner gets
+  assert.ok((await json(await call('/my-auctions.php', { user: adm.cookie }))).auctions.some((x) => x.id === id && x.role === 'admin'));
+  assert.equal((await save('By admin', 4000, { user: adm.cookie })).status, 200);
+  assert.equal((await call(`/photos.php?id=${id}`, { method: 'POST', user: adm.cookie, body: { put: {}, remove: [] } })).status, 200);
+  // ...but cannot delete the auction, and cannot make another admin.
+  assert.equal((await call(`/auction.php?id=${id}&action=delete`, { method: 'POST', user: adm.cookie })).status, 403);
+  assert.equal((await invite(adm.cookie, auc.email, 'admin')).status, 403);
+  assert.equal((await invite(adm.cookie, auc.email, 'auctioneer')).status, 200);
+  assert.equal((await invite(adm.cookie, dat.email, 'data')).status, 200);
+  assert.equal((await invite(adm.cookie, ownerEmail, 'data')).status, 400);
+
+  // Auctioneer and data-entry both save; only owner, admin and auctioneer collect owner bids.
+  assert.equal((await save('By auctioneer', 4100, { user: auc.cookie })).status, 200);
+  assert.equal((await save('By data entry', 4200, { user: dat.cookie })).status, 200);
+  assert.equal((await call(`/bid.php?id=${id}`, { user: auc.cookie })).status, 200);
+  assert.equal((await call(`/bid.php?id=${id}`, { user: dat.cookie })).status, 403);
+  // Data entry can look at the list but not change it; outsiders cannot even look.
+  assert.equal((await invite(dat.cookie, out.email, 'data')).status, 403);
+  const list = await json(await call(`/members.php?id=${id}`, { user: dat.cookie }));
+  assert.equal(list.canManage, false);
+  assert.deepEqual(list.members.map((m) => [m.email, m.role]).sort(), [[adm.email, 'admin'], [auc.email, 'auctioneer'], [dat.email, 'data']].sort());
+  assert.equal((await call(`/members.php?id=${id}`, { user: out.cookie })).status, 403);
+  assert.equal((await save('By outsider', 4300, { user: out.cookie })).status, 403);
+
+  // Two devices saving at the same moment: the second is told, nothing is overwritten.
+  const v0 = (await me(A)).version;
+  const put = (user, name, base, client) => call(`/auction.php?id=${id}`, { method: 'POST', user, body: { name, updatedAt: Date.now(), data: data(name), base, client } });
+  r = await put(A, 'From laptop', v0, 'aaaaaaaaaaaaaaaa');
+  assert.equal(r.status, 200);
+  const v1 = (await r.json()).version;
+  assert.equal(v1, v0 + 1);
+  r = await put(adm.cookie, 'From phone, stale', v0, 'bbbbbbbbbbbbbbbb');
+  assert.equal(r.status, 409);
+  assert.deepEqual(await r.json(), { error: 'conflict', version: v1 });
+  assert.equal((await me(A)).data.settings.name, 'From laptop');
+  assert.equal((await me(A)).by, 'aaaaaaaaaaaaaaaa');
+  // Seeing the latest first makes it go through; the same device can save over its own work in any case.
+  assert.equal((await put(adm.cookie, 'From phone', v1, 'bbbbbbbbbbbbbbbb')).status, 200);
+  assert.equal((await put(adm.cookie, 'From phone again', v0, 'bbbbbbbbbbbbbbbb')).status, 200);
+  // Older apps that send no base keep working.
+  assert.equal((await save('No base', 5000, { user: A })).status, 200);
+
+  // Changing a role, removing, and leaving.
+  assert.equal((await invite(adm.cookie, dat.email, 'auctioneer')).status, 200);
+  assert.equal((await call(`/bid.php?id=${id}`, { user: dat.cookie })).status, 200);
+  // An admin cannot remove an admin (not even themselves: they can leave); the owner can.
+  assert.equal((await call(`/members.php?id=${id}&action=remove`, { method: 'POST', user: adm.cookie, body: { email: adm.email } })).status, 403);
+  assert.equal((await call(`/members.php?id=${id}&action=remove`, { method: 'POST', user: A, body: { email: adm.email } })).status, 200);
+  assert.equal((await save('Removed admin', 6000, { user: adm.cookie })).status, 403);
+  assert.equal((await call(`/members.php?id=${id}&action=leave`, { method: 'POST', user: dat.cookie })).status, 200);
+  assert.equal((await save('Left', 6100, { user: dat.cookie })).status, 403);
+  assert.equal((await call(`/members.php?id=${id}&action=leave`, { method: 'POST', user: A })).status, 400);
+  assert.equal((await call(`/members.php?id=${id}&action=remove`, { method: 'POST', user: A, body: { email: auc.email } })).status, 200);
+  assert.equal((await me(A)).shared, false);
+});
+await check('sharing: an invited friend on the free plan can save an auction of a Pro owner', async () => {
+  const P = helper('user', '9' + Date.now(), 'Pro Owner');
+  const ADMIN2 = helper('user', '10' + Date.now(), 'Boss Two', 'admin');
+  const F = helper('user', '11' + Date.now(), 'Free Friend');
+  const list = (await json(await call('/admin.php', { user: ADMIN2 }))).users;
+  const pro = list.find((u) => u.email.startsWith('9') && u.name === 'Pro Owner');
+  const friend = list.find((u) => u.name === 'Free Friend');
+  await call('/admin.php', { method: 'POST', user: ADMIN2, body: { userId: pro.id, plan: 'pro' } });
+  const sid = 'a_' + rnd().slice(0, 14);
+  const withTeams = (n) => ({ ...data('Big'), teams: Array.from({ length: n }, (_, i) => ({ id: 't' + i, name: 'T' + i })) });
+  const put = (user, n) => call(`/auction.php?id=${sid}`, { method: 'POST', user, body: { name: 'Big', updatedAt: Date.now(), data: withTeams(n) } });
+  assert.equal((await put(P, 8)).status, 200);
+  assert.equal((await call(`/members.php?id=${sid}`, { method: 'POST', user: P, body: { email: friend.email, role: 'admin' } })).status, 200);
+  assert.equal((await put(F, 8)).status, 200);
+  // The owner's plan decides, so the friend may add teams too.
+  assert.equal((await put(F, 9)).status, 200);
+  await call(`/auction.php?id=${sid}&action=delete`, { method: 'POST', user: P });
+});
+await check('registration link: owner picks a readable name; it resolves and previews', async () => {
+  const slug = 'fpl-' + rnd().slice(0, 8) + '-register';
+  const setSlug = (user, s, aid = id) => call(`/slug.php?id=${aid}`, { method: 'POST', user, body: { slug: s } });
+  // Not signed in, a stranger, and badly written names are all refused.
+  assert.equal((await setSlug(undefined, slug)).status, 401);
+  assert.equal((await setSlug(B, slug)).status, 403);
+  for (const bad of ['ab', 'Has-Capitals', 'two--hyphens', '-leading', 'trailing-', 'with space', 'a'.repeat(51), 'sl/ash', '']) {
+    assert.equal((await setSlug(A, bad)).status, 400, 'bad slug: ' + bad);
+  }
+  r = await setSlug(A, slug);
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), { slug });
+  // Anyone can resolve it, and the auction reply carries it.
+  const found = await json(await call(`/slug.php?s=${slug}`));
+  assert.equal(found.id, id);
+  assert.equal((await json(await call(`/auction.php?id=${id}`))).slug, slug);
+  assert.equal((await call('/slug.php?s=nope-nothing-here')).status, 404);
+  assert.equal((await call('/slug.php?s=Bad_Slug!')).status, 404);
+  // A name taken by one auction cannot be used by another.
+  const other = 'a_' + rnd().slice(0, 14);
+  await call(`/auction.php?id=${other}`, { method: 'POST', user: A, body: { name: 'Other', updatedAt: Date.now(), data: data('Other') } });
+  r = await setSlug(A, slug, other);
+  assert.equal(r.status, 409);
+  assert.equal((await r.json()).error, 'slug_taken');
+  // Setting the same name again on the same auction is fine, and an admin or auctioneer role is checked.
+  assert.equal((await setSlug(A, slug)).status, 200);
+  // The page behind /register/<name>: preview tags for WhatsApp and a redirect to the form.
+  const d = data('Preview "League" <b>');
+  d.settings.venue = 'Ground & Co';
+  d.settings.date = '2026-11-20T18:00';
+  await call(`/auction.php?id=${id}`, { method: 'POST', user: A, body: { name: 'Preview "League" <b>', updatedAt: Date.now(), data: d } });
+  const page = await call(`/reglink.php?s=${slug}`);
+  assert.equal(page.status, 200);
+  assert.match(page.headers.get('content-type') ?? '', /text\/html/);
+  const html = await page.text();
+  assert.ok(html.includes('og:title" content="Player registration · Preview &quot;League&quot; &lt;b&gt;"'), 'title escaped');
+  assert.ok(html.includes('Fri 20 Nov 2026 · Ground &amp; Co'));
+  assert.ok(html.includes(`/app/a/${id}/register`));
+  assert.ok(!html.includes('<b>'), 'no raw html from the name');
+  assert.equal((await call(`/reglink.php?s=unknown-link`)).status, 404);
+
+  // The old long link forwards to the readable one; an auction without one is left to the app.
+  const manual = (path) => fetch(base + path, { redirect: 'manual' });
+  r = await manual(`/reglink.php?id=${id}`);
+  assert.equal(r.status, 302);
+  assert.equal(r.headers.get('location'), `/register/${slug}`);
+  r = await manual(`/reglink.php?id=${other}`);
+  assert.notEqual(r.status, 302);
+  assert.equal((await manual(`/reglink.php?id=../x`)).status, 400);
+
+  // Renaming keeps the old name working: it forwards to the new one, and nobody else can take it.
+  const renamed = slug + '-v2';
+  assert.equal((await setSlug(A, renamed)).status, 200);
+  r = await manual(`/reglink.php?s=${slug}`);
+  assert.equal(r.status, 302);
+  assert.equal(r.headers.get('location'), `/register/${renamed}`);
+  assert.equal((await call(`/reglink.php?s=${renamed}`)).status, 200);
+  assert.equal((await manual(`/reglink.php?id=${id}`)).headers.get('location'), `/register/${renamed}`);
+  assert.equal((await json(await call(`/slug.php?s=${slug}`))).slug, renamed);
+  assert.equal((await json(await call(`/auction.php?id=${id}`))).slug, renamed);
+  r = await setSlug(A, slug, other);
+  assert.equal(r.status, 409);
+  assert.equal((await r.json()).error, 'slug_taken');
+  // Going back to the earlier name works, and the later one then forwards.
+  assert.equal((await setSlug(A, slug)).status, 200);
+  assert.equal((await call(`/reglink.php?s=${slug}`)).status, 200);
+  assert.equal((await manual(`/reglink.php?s=${renamed}`)).headers.get('location'), `/register/${slug}`);
+  // Deleting the auction frees its names.
+  await call(`/auction.php?id=${other}&action=delete`, { method: 'POST', user: A });
 });
 await check('only its account can delete; then it is gone', async () => {
   assert.equal((await call(`/auction.php?id=${id}&action=delete`, { method: 'POST', user: B })).status, 403);

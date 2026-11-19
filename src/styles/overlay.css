@@ -1,0 +1,107 @@
+/* =========================================================
+   Streaming overlay — graphics laid over a camera picture in OBS.
+   The page is see-through. Every size follows the width (vw), so the
+   same page fits a 1280x720 and a 1920x1080 stream.
+   ========================================================= */
+
+.ov {
+  --out: cubic-bezier(0.16, 1, 0.3, 1);
+  --hi: #f2b631;
+  --ink: #0b1220;
+  position: fixed; inset: 0; overflow: hidden; color: #fff; font-family: var(--body);
+  text-shadow: 0 0.1vw 0.3vw rgb(0 0 0 / 0.35);
+}
+
+/* ---------- tournament tag, top left ---------- */
+.ov-tag {
+  position: absolute; left: 2.6vw; top: 2.4vw; display: flex; align-items: center; gap: 0.8vw;
+  padding: 0.5vw 1.2vw 0.5vw 0.5vw; border-radius: 0.7vw; background: rgb(11 18 32 / 0.88);
+  box-shadow: 0 0.6vw 1.6vw -0.6vw rgb(0 0 0 / 0.7); animation: ovDown 0.7s var(--out) both;
+}
+.ov-tag-logo {
+  width: 2.8vw; height: 2.8vw; border-radius: 0.5vw; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(145deg, #ffe3a1, var(--hi) 45%, #a8700f); color: #1a1204; font: 700 1.4vw var(--display); text-shadow: none;
+}
+.ov-tag-text { display: flex; flex-direction: column; gap: 0.2vw; }
+.ov-tag-text strong { font: 700 1.5vw/1 var(--display); letter-spacing: 0.04em; text-transform: uppercase; max-width: 30vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ov-tag-text small { display: flex; align-items: center; gap: 0.4vw; font-size: 0.68vw; font-weight: 800; letter-spacing: 0.22em; color: #cbd5e4; }
+.ov-dot { width: 0.55vw; height: 0.55vw; border-radius: 50%; background: #ff5a52; animation: ovBlink 1.4s ease-in-out infinite; }
+
+/* ---------- sponsor, top right ---------- */
+.ov-sponsor {
+  position: absolute; right: 2.6vw; top: 2.4vw; display: flex; flex-direction: column; align-items: flex-end; gap: 0.35vw;
+  padding: 0.5vw 0.7vw 0.6vw; border-radius: 0.7vw; background: rgb(11 18 32 / 0.88);
+  box-shadow: 0 0.6vw 1.6vw -0.6vw rgb(0 0 0 / 0.7); animation: ovDown 0.7s 0.1s var(--out) both;
+}
+.ov-sponsor small { font-size: 0.62vw; font-weight: 800; letter-spacing: 0.24em; color: #cbd5e4; }
+.ov-sponsor-chip {
+  display: flex; align-items: center; justify-content: center; height: 3.4vw; min-width: 7vw; max-width: 16vw; padding: 0 0.8vw; border-radius: 0.45vw;
+  font: 700 1.5vw/1 var(--display); letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; overflow: hidden; animation: ovFade 0.6s ease both;
+}
+.ov-sponsor-chip.has-logo { background: #fff; padding: 0.25vw 0.6vw; }
+.ov-sponsor-chip img { display: block; height: 100%; max-width: 100%; object-fit: contain; }
+
+/* ---------- the bar along the bottom ---------- */
+.ov-bar {
+  position: absolute; left: 4vw; right: 4vw; bottom: 3.4vw; height: 7.4vw; display: flex; align-items: stretch;
+  border-radius: 0.9vw; background: rgb(11 18 32 / 0.94); box-shadow: 0 1.2vw 3vw -1vw rgb(0 0 0 / 0.8);
+  border-bottom: 0.3vw solid var(--cat); animation: ovUp 0.75s var(--out) both;
+}
+.ov-photo {
+  position: relative; width: 7.4vw; height: 9.4vw; margin-top: -2vw; margin-left: 1vw; flex-shrink: 0; border-radius: 0.7vw 0.7vw 0 0; overflow: hidden;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--cat) 70%, #0b1220), #0b1220); font-size: 5vw; display: block;
+  box-shadow: 0 0 0 0.18vw rgb(255 255 255 / 0.16);
+}
+.ov-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ov-who { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 0.45vw; padding: 0 1.4vw; }
+.ov-kicker { display: flex; align-items: center; gap: 0.6vw; font-size: 0.86vw; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #cbd5e4; white-space: nowrap; overflow: hidden; }
+.ov-kicker b { color: var(--hi); font-size: 1vw; }
+.ov-cat { padding: 0.2vw 0.55vw; border-radius: 0.3vw; background: var(--cat); color: #fff; font-size: 0.72vw; letter-spacing: 0.14em; text-shadow: none; }
+.ov-name { font: 700 3.1vw/1 var(--display); letter-spacing: 0.02em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.ov-bid { flex-shrink: 0; display: flex; flex-direction: column; justify-content: center; align-items: flex-end; gap: 0.35vw; padding: 0 1.6vw; border-left: 1px solid rgb(255 255 255 / 0.1); }
+.ov-bid small, .ov-team-text small { font-size: 0.7vw; font-weight: 800; letter-spacing: 0.22em; color: #aab6ca; }
+.ov-amt { font: 700 3.3vw/1 var(--display); color: var(--hi); }
+
+.ov-team {
+  flex-shrink: 0; width: 21vw; display: flex; align-items: center; gap: 0.9vw; padding: 0 1.4vw; border-radius: 0 0.9vw 0 0;
+  background: linear-gradient(100deg, color-mix(in srgb, var(--tc) 82%, #000), var(--tc)); animation: ovWipe 0.55s var(--out) both;
+}
+.ov-team .team-badge { width: 3.6vw !important; height: 3.6vw !important; font-size: 1.5vw !important; }
+.ov-team-text { display: flex; flex-direction: column; gap: 0.3vw; min-width: 0; }
+.ov-team-text small { color: rgb(255 255 255 / 0.82); }
+.ov-team-text strong { font: 700 1.9vw/1 var(--display); letter-spacing: 0.03em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ov-team.wait { background: #1a2540; }
+.ov-team.none { background: #7a1f1a; justify-content: center; }
+.ov-team.none strong { font-size: 2.6vw; letter-spacing: 0.16em; }
+
+.ov-timer {
+  position: absolute; right: 1vw; top: -3.3vw; width: 3.6vw; height: 2.7vw; border-radius: 0.5vw 0.5vw 0 0; display: flex; align-items: center; justify-content: center;
+  background: rgb(11 18 32 / 0.94); font: 700 1.8vw/1 var(--display); color: #fff; top: -2.7vw;
+}
+.ov-timer.hot { background: #d92d20; }
+
+.ov-stamp {
+  position: absolute; left: 9.6vw; top: -2.5vw; padding: 0.35vw 1.1vw; border-radius: 0.4vw; transform: rotate(-4deg);
+  background: linear-gradient(145deg, #ffe3a1, var(--hi) 45%, #b47a12); color: #1a1204; font: 700 2vw/1 var(--display); letter-spacing: 0.18em; text-shadow: none;
+  box-shadow: 0 0.5vw 1.4vw -0.4vw rgb(0 0 0 / 0.7); animation: ovStamp 0.5s 0.15s var(--out) both;
+}
+.ov-bar.unsold { border-bottom-color: #d92d20; }
+.ov-bar.unsold .ov-photo img { filter: grayscale(1); }
+
+/* ---------- between players ---------- */
+.ov-note {
+  position: absolute; left: 50%; bottom: 3.4vw; transform: translateX(-50%); max-width: 84vw; padding: 0.8vw 1.8vw; border-radius: 0.7vw;
+  background: rgb(11 18 32 / 0.9); font-size: 1.25vw; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  border-bottom: 0.25vw solid var(--hi); animation: ovFade 0.6s ease both;
+}
+
+@keyframes ovUp { from { transform: translateY(140%); } to { transform: none; } }
+@keyframes ovDown { from { transform: translateY(-160%); } to { transform: none; } }
+@keyframes ovFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ovWipe { from { clip-path: inset(0 0 0 100%); } to { clip-path: inset(0); } }
+@keyframes ovStamp { from { opacity: 0; transform: rotate(-4deg) scale(1.9); } to { opacity: 1; transform: rotate(-4deg) scale(1); } }
+@keyframes ovBlink { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) {
+  .ov * { animation: none !important; }
+}

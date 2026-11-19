@@ -68,7 +68,7 @@ write(
 );
 
 // 4. robots.txt: the website is open; the app, its private auction links and the API are not.
-write('robots.txt', `User-agent: *\nAllow: /\nDisallow: /app/\nDisallow: /api/\n\nSitemap: ${SITE.url}/sitemap.xml\n`);
+write('robots.txt', `User-agent: *\nAllow: /\nDisallow: /app/\nDisallow: /api/\nDisallow: /register/\n\nSitemap: ${SITE.url}/sitemap.xml\n`);
 
 // 5. .htaccess (Hostinger runs LiteSpeed, which reads it like Apache).
 const altRules = SITE.altDomains
@@ -93,6 +93,13 @@ RewriteCond %{HTTP:X-Forwarded-Proto} !https
 RewriteRule ^ https://${host}%{REQUEST_URI} [L,R=301]
 RewriteCond %{HTTP_HOST} ^www\\.${host.replace(/\./g, '\\.')}$ [NC]
 RewriteRule ^ https://${host}%{REQUEST_URI} [L,R=301]
+
+# Readable registration links: /register/<name> opens the page that sends players to the form
+RewriteRule ^register/([a-z0-9-]{3,50})/?$ /api/reglink.php?s=$1 [L,QSA]
+# The old long registration link forwards to the readable one once an auction has it
+# (reglink.php hands the app over when it does not). ?via=link is added by the readable page.
+RewriteCond %{QUERY_STRING} !(^|&)via=
+RewriteRule ^app/a/([a-z]_[a-z0-9]{5,44})/register/?$ /api/reglink.php?id=$1 [L]
 
 # The app: every /app/... address that isn't a real file opens the app
 RewriteRule ^app$ /app/ [L,R=301]

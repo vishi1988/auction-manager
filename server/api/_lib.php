@@ -11,6 +11,10 @@
 //   the account.
 // - Anyone who has an auction's link may read it, which is how the live
 //   screen works on a projector or a phone.
+// - The owner can invite others by Google email (members.php). A member has a
+//   role: admin (everything but deleting), auctioneer (runs the console) or
+//   data (adds players and teams). The server lets all three save the
+//   auction; which screens each role gets is decided in the app.
 
 declare(strict_types=1);
 
@@ -156,6 +160,30 @@ function ensure_tables(PDO $pdo): void
         $pdo->exec('ALTER TABLE auctions ADD COLUMN user_id INT NULL');
         $pdo->exec('CREATE INDEX auctions_user ON auctions (user_id)');
     }
+    // Which device saved last: two admins saving at once is told apart from one admin's two tabs.
+    if (!column_exists($pdo, 'auctions', 'last_client')) {
+        $pdo->exec("ALTER TABLE auctions ADD COLUMN last_client VARCHAR(24) NOT NULL DEFAULT ''");
+    }
+    // Readable name of the registration link: khiladiauction.com/register/<slug> (slug.php).
+    if (!column_exists($pdo, 'auctions', 'slug')) {
+        $pdo->exec('ALTER TABLE auctions ADD COLUMN slug VARCHAR(60) NULL');
+        $pdo->exec('CREATE UNIQUE INDEX auctions_slug ON auctions (slug)');
+    }
+    // Earlier names of a registration link: they keep working and forward to the current one.
+    $pdo->exec('CREATE TABLE IF NOT EXISTS slug_history (
+        slug VARCHAR(60) NOT NULL PRIMARY KEY,
+        auction_id VARCHAR(48) NOT NULL,
+        created_at BIGINT NOT NULL
+    )' . $tail);
+    // People the owner invited, by Google email (checked when they sign in).
+    $pdo->exec('CREATE TABLE IF NOT EXISTS auction_members (
+        auction_id VARCHAR(48) NOT NULL,
+        email VARCHAR(254) NOT NULL,
+        role VARCHAR(12) NOT NULL,
+        invited_by INT NULL,
+        created_at BIGINT NOT NULL,
+        PRIMARY KEY (auction_id, email)
+    )' . $tail);
 }
 
 function column_exists(PDO $pdo, string $table, string $column): bool
@@ -229,28 +257,96 @@ function json_body(int $max): array
 
 function find_auction(string $id): ?array
 {
-    $q = db()->prepare('SELECT id, owner_hash, user_id, version, photos_version, updated_at FROM auctions WHERE id = ?');
+    $q = db()->prepare('SELECT id, owner_hash, user_id, version, photos_version, updated_at, last_client FROM auctions WHERE id = ?');
     $q->execute([$id]);
     $row = $q->fetch();
     return $row ?: null;
 }
 
+/** 3-50 lowercase letters, digits and single hyphens: the readable name of a registration link. */
+function valid_slug(string $s): bool
+{
+    return strlen($s) >= 3 && strlen($s) <= 50 && preg_match('/^[a-z0-9]+(-[a-z0-9]+)*$/', $s) === 1;
+}
+
 /**
- * True when this request may change the auction: the signed-in account it
- * belongs to, or (for an auction not yet in any account) the browser holding
- * its owner token.
+ * The auction (id, name, data, slug) behind a registration link name. An
+ * earlier name of a link that was renamed finds the auction too; its `slug` is
+ * always the current name, so the caller can tell and forward.
  */
+function find_by_slug(string $slug): ?array
+{
+    $q = db()->prepare('SELECT id, name, data, slug FROM auctions WHERE slug = ?');
+    $q->execute([$slug]);
+    $row = $q->fetch();
+    if ($row) return $row;
+    $q = db()->prepare('SELECT a.id, a.name, a.data, a.slug FROM slug_history h JOIN auctions a ON a.id = h.auction_id WHERE h.slug = ?');
+    $q->execute([$slug]);
+    return $q->fetch() ?: null;
+}
+
+/** What may be shown about an auction on its registration page: name, sport, date and place. */
+function auction_headline(array $row): array
+{
+    $d = json_decode((string)$row['data'], true);
+    $s = is_array($d['settings'] ?? null) ? $d['settings'] : [];
+    return [
+        'id' => $row['id'],
+        'name' => (string)$row['name'],
+        'slug' => (string)($row['slug'] ?? ''),
+        'sport' => is_string($s['sport'] ?? null) ? $s['sport'] : 'cricket',
+        'date' => is_string($s['date'] ?? null) ? $s['date'] : '',
+        'venue' => is_string($s['venue'] ?? null) ? $s['venue'] : '',
+    ];
+}
+
+const MEMBER_ROLES = ['admin', 'auctioneer', 'data'];
+const MAX_MEMBERS = 12;
+
+function norm_email(string $email): string
+{
+    return strtolower(trim($email));
+}
+
+/**
+ * What this request is to the auction: 'owner' (its account, or the browser
+ * holding the token of an auction not yet in any account), an invited
+ * 'admin' / 'auctioneer' / 'data', or null for everyone else.
+ */
+function role_of(array $auction, ?array $user): ?string
+{
+    if ($auction['user_id'] !== null) {
+        if ($user === null) return null;
+        if ((int)$auction['user_id'] === (int)$user['id']) return 'owner';
+        $email = norm_email((string)($user['email'] ?? ''));
+        if ($email === '') return null;
+        $q = db()->prepare('SELECT role FROM auction_members WHERE auction_id = ? AND email = ?');
+        $q->execute([$auction['id'], $email]);
+        $role = $q->fetchColumn();
+        return is_string($role) && in_array($role, MEMBER_ROLES, true) ? $role : null;
+    }
+    $h = owner_hash();
+    return $h !== null && hash_equals($auction['owner_hash'], $h) ? 'owner' : null;
+}
+
+/** True when this request may change the auction: its owner, or an invited admin, auctioneer or data-entry member. */
 function can_edit(array $auction, ?array $user): bool
 {
-    if ($auction['user_id'] !== null) return $user !== null && (int)$auction['user_id'] === (int)$user['id'];
-    $h = owner_hash();
-    return $h !== null && hash_equals($auction['owner_hash'], $h);
+    return role_of($auction, $user) !== null;
 }
 
 /** Stops unless the request may change this auction. */
 function require_owner(array $auction, ?array $user = null): void
 {
     if (!can_edit($auction, $user ?? current_user())) fail(403, 'not_owner');
+}
+
+/** Stops unless the request's role on this auction is one of $roles (e.g. only owner and admin invite people). */
+function require_role(array $auction, ?array $user, string ...$roles): string
+{
+    $role = role_of($auction, $user ?? current_user());
+    if ($role === null || !in_array($role, $roles, true)) fail(403, 'not_allowed');
+    return $role;
 }
 
 // ---------- signed-in users ----------

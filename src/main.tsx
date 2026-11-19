@@ -2,7 +2,7 @@ import { StrictMode, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { EMBED } from './components/ScreenLink';
-import { AuctionRoute } from './components/AuctionRoute';
+import { AuctionRoute, RequireRole } from './components/AuctionRoute';
 import { AppLayout, AuctionLayout } from './components/Layout';
 import './styles/app.css';
 
@@ -18,9 +18,11 @@ const Overview = page(() => import('./pages/Overview'), 'Overview');
 const Settings = page(() => import('./pages/Settings'), 'Settings');
 const Teams = page(() => import('./pages/Teams'), 'Teams');
 const Players = page(() => import('./pages/Players'), 'Players');
+const Team = page(() => import('./pages/Team'), 'Team');
 const Console = page(() => import('./pages/Console'), 'Console');
 const Results = page(() => import('./pages/Results'), 'Results');
 const Live = page(() => import('./pages/Live'), 'Live');
+const Overlay = page(() => import('./pages/Overlay'), 'Overlay');
 const Owner = page(() => import('./pages/Owner'), 'Owner');
 const Register = page(() => import('./pages/Register'), 'Register');
 
@@ -51,14 +53,16 @@ createRoot(document.getElementById('root')!).render(
           <Route path="a/:auctionId" element={<AuctionRoute />}>
             <Route element={<AuctionLayout />}>
               <Route index element={<Overview />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="teams" element={<Teams />} />
-              <Route path="players" element={<Players />} />
-              <Route path="console" element={<Console />} />
-              <Route path="results" element={<Results />} />
+              <Route path="settings" element={<RequireRole area="settings"><Settings /></RequireRole>} />
+              <Route path="teams" element={<RequireRole area="teams"><Teams /></RequireRole>} />
+              <Route path="players" element={<RequireRole area="players"><Players /></RequireRole>} />
+              <Route path="console" element={<RequireRole area="console"><Console /></RequireRole>} />
+              <Route path="results" element={<RequireRole area="results"><Results /></RequireRole>} />
+              <Route path="team" element={<RequireRole area="team"><Team /></RequireRole>} />
             </Route>
             {/* Public screens: no admin menu */}
             <Route path="live" element={<Live />} />
+            <Route path="overlay" element={<Overlay />} />
             <Route path="owner" element={<Owner />} />
             <Route path="owner/:teamId" element={<Owner />} />
             <Route path="register" element={<Register />} />

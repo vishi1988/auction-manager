@@ -491,3 +491,15 @@
   .tick-total { display: none; }
   .raise { position: static; margin: 0; align-self: flex-start; }
 }
+
+/* ---------- sponsors ---------- */
+.sponsor-bar { flex-shrink: 0; display: flex; align-items: center; gap: 16px; height: clamp(44px, 7.4vh, 68px); padding: 0 16px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line-d); overflow: hidden; }
+.sponsor-bar-label { flex-shrink: 0; font-size: 11.5px; font-weight: 800; letter-spacing: 0.24em; color: var(--fg-3); }
+.sponsor-bar-list { flex: 1; min-width: 0; height: 100%; display: flex; align-items: center; justify-content: space-evenly; gap: 14px; padding: clamp(5px, 0.9vh, 9px) 0; overflow: hidden; }
+.sponsor-chip { display: inline-flex; align-items: center; justify-content: center; height: 100%; min-width: 0; padding: 0 14px; border-radius: 8px; font: 700 clamp(15px, 2.6vh, 24px)/1 var(--display); letter-spacing: 0.05em; text-transform: uppercase; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sponsor-chip.has-logo { background: #fff; padding: 3px 10px; flex-shrink: 0; }
+.sponsor-chip img { display: block; height: 100%; width: auto; max-width: 22vw; object-fit: contain; }
+@media (max-width: 600px) {
+  .sponsor-bar-label { display: none; }
+  .sponsor-bar-list { justify-content: flex-start; overflow-x: auto; }
+}

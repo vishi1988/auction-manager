@@ -1,5 +1,5 @@
 <?php
-// Player photos and team logos of one auction, kept apart from the auction
+// Player photos, team logos and sponsor logos of one auction, kept apart from the auction
 // data so a bid doesn't re-send every picture.
 //
 // GET  photos.php?id=ID                      200 {photosVersion, photos: {key: dataUrl}}
@@ -26,7 +26,7 @@ $put = $body['put'] ?? [];
 $remove = $body['remove'] ?? [];
 if (!is_array($put) || !is_array($remove) || count($put) + count($remove) > MAX_PHOTOS_PER_SAVE * 4) fail(400, 'bad_photos');
 
-$validKey = fn($k) => is_string($k) && preg_match('/^(player|team)-[A-Za-z0-9_-]{1,56}$/', $k);
+$validKey = fn($k) => is_string($k) && preg_match('/^(player|team|sponsor)-[A-Za-z0-9_-]{1,56}$/', $k);
 foreach ($put as $key => $data) {
     if (!$validKey($key)) fail(400, 'bad_photo_key');
     if (!is_string($data) || strlen($data) > MAX_PHOTO_BYTES || !preg_match('#^data:image/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=]+$#', $data)) fail(400, 'bad_photo');

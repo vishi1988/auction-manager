@@ -8,14 +8,41 @@
 //
 // Screens that watch an auction ask the server about once a second whether it
 // changed; the server answers "nothing new" cheaply until it has.
-import type { AppState, AuctionMeta, Registration } from '../types';
+import type { AccessRole, AppState, AuctionMeta, Registration } from '../types';
 import { diffPhotos, mergePhotos, splitPhotos, type PhotoMap } from './photos';
 
 export interface RemoteAuction {
-  /** True when the token sent with the request is this auction's owner token. */
+  /** True when this browser may change the auction: its owner, or someone the owner invited. */
   mine: boolean;
+  /** What this browser is to the auction (null when only watching). */
+  role: AccessRole | null;
+  /** True when the owner has invited other people, so changes can come from other devices. */
+  shared: boolean;
+  /** Server version of this copy, and the device that saved it last. */
+  version: number;
+  by: string;
+  /** Readable name of the registration link (khiladiauction.com/register/<slug>), or ''. */
+  slug: string;
   updatedAt: number;
   state: AppState;
+}
+
+/** One person an auction is shared with. */
+export interface Member {
+  email: string;
+  role: Exclude<AccessRole, 'owner'>;
+  name: string;
+  picture: string;
+  /** Has signed in at least once. */
+  joined: boolean;
+}
+
+export interface MemberList {
+  role: AccessRole;
+  canManage: boolean;
+  owner: { name: string; email: string; picture: string };
+  members: Member[];
+  max: number;
 }
 
 /** A bid an owner tapped on their phone, waiting for the organiser's app. */
@@ -40,6 +67,21 @@ export type CloudStatus =
   | { kind: 'error'; message: string };
 
 export interface Cloud {
+  /** This device's id, sent with every save so two devices saving at once can be told apart. */
+  readonly clientId: string;
+  /** Called with the new server version after each save that went through. */
+  onSaved(listener: (id: string, version: number) => void): void;
+  /** Called when a save was refused because another device saved first. */
+  onConflict(listener: (id: string) => void): void;
+  /** Fetches the latest copy of a watched auction right away. */
+  refresh(id: string): void;
+  /** The people an auction is shared with (owner and admins manage it). */
+  listMembers(id: string): Promise<MemberList>;
+  inviteMember(id: string, email: string, role: Member['role']): Promise<void>;
+  removeMember(id: string, email: string): Promise<void>;
+  leaveAuction(id: string): Promise<void>;
+  /** Sets the readable registration link name. Rejects with 'slug_taken' or 'bad_slug'. */
+  setSlug(id: string, slug: string): Promise<string>;
   saveAuction(id: string, state: AppState, updatedAt: number, token: string): void;
   /** Sends saves that waited for a sign-in. */
   retry(): void;
@@ -78,6 +120,8 @@ function explain(err: unknown): string {
   if (err instanceof HttpError) {
     if (err.code === 'login_required') return 'Sign in with Google to keep saving online. Your changes are kept on this device.';
     if (err.code === 'not_owner') return 'This auction belongs to another account, so changes from here are not saved.';
+    if (err.code === 'not_allowed' || err.code === 'owner_only') return 'Your role in this auction does not allow that.';
+    if (err.code === 'conflict') return 'Someone else changed the auction at the same moment, so your last change was not saved. The latest version is shown now.';
     if (err.code === 'db_unavailable' || err.code === 'not_configured') return 'The server database is not set up yet (api/config.php).';
     if (err.code === 'too_large') return 'This auction is too big to save online. Use smaller player photos.';
     return 'The server refused the save (' + err.code + ').';
@@ -85,8 +129,35 @@ function explain(err: unknown): string {
   return 'No internet right now. Changes are kept on this device and sent when the connection is back.';
 }
 
+const CLIENT_KEY = 'auction-app:client-id';
+
+const randomClientId = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, '0')).join('');
+
+/** A short random id for this browser (not a secret): lets the server tell two devices apart. */
+function readClientId(): string {
+  try {
+    const saved = localStorage.getItem(CLIENT_KEY);
+    if (saved && /^[a-f0-9]{16}$/.test(saved)) return saved;
+    const fresh = randomClientId();
+    localStorage.setItem(CLIENT_KEY, fresh);
+    return fresh;
+  } catch {
+    return randomClientId();
+  }
+}
+
 export function createCloud(apiBase: string): Cloud {
   const base = apiBase.replace(/\/?$/, '/');
+  const clientId = readClientId();
+  /** Latest server version this device has seen for each auction (its own saves and what it downloaded). */
+  const versions = new Map<string, number>();
+  const savedListeners: ((id: string, version: number) => void)[] = [];
+  const conflictListeners: ((id: string) => void)[] = [];
+  /** Per watched auction: fetch the full copy again right now. */
+  const refreshers = new Map<string, () => void>();
+  // Auctions the server does not have yet (404). The browser holding the owner token
+  // has them already, so it checks only now and then; its first save online checks at once.
+  const notOnline = new Set<string>();
 
   let status: CloudStatus = { kind: 'connecting' };
   const listeners = new Set<() => void>();
@@ -147,7 +218,12 @@ export function createCloud(apiBase: string): Cloud {
         const [id, job] = pending.entries().next().value as [string, Pending];
         const { lean, photos } = splitPhotos(job.state);
         try {
-          await request('auction.php?id=' + id, { method: 'POST', token: job.token, body: { name: lean.settings.name, updatedAt: job.updatedAt, data: lean } });
+          const saved = await request('auction.php?id=' + id, { method: 'POST', token: job.token, body: { name: lean.settings.name, updatedAt: job.updatedAt, data: lean, client: clientId, base: versions.get(id) } });
+          const savedVersion = Number(saved?.version);
+          if (savedVersion > 0) {
+            versions.set(id, savedVersion);
+            for (const l of savedListeners) l(id, savedVersion);
+          }
           const { put, remove } = diffPhotos(await knownPhotos(id), photos);
           if (Object.keys(put).length || remove.length) {
             // Several small requests rather than one huge one, so big squads with photos still fit.
@@ -160,10 +236,18 @@ export function createCloud(apiBase: string): Cloud {
           }
           // Drop it unless a newer save arrived while this one was on its way.
           if (pending.get(id) === job) pending.delete(id);
+          if (notOnline.has(id)) refreshers.get(id)?.();
           retryDelay = 2000;
           setStatus({ kind: 'on' });
         } catch (err) {
           console.warn('Cloud save', err);
+          if (err instanceof HttpError && err.status === 409) {
+            // Another admin saved first. Their version wins; this device downloads it and says so.
+            if (pending.get(id) === job) pending.delete(id);
+            for (const l of conflictListeners) l(id);
+            refreshers.get(id)?.();
+            continue;
+          }
           setStatus({ kind: 'error', message: explain(err) });
           if (err instanceof HttpError && err.status === 401) {
             // Signed out (or the sign-in expired): keep everything and wait for retry().
@@ -207,11 +291,14 @@ export function createCloud(apiBase: string): Cloud {
     let photos: PhotoMap = {};
     let timer: ReturnType<typeof setTimeout> | null = null;
     let mine = false;
+    let role: AccessRole | null = null;
+    let shared = false;
 
     // Bids from owners' phones need an answer within a second or two, so the
     // organiser's browser checks for them often (a cheap request) while it is on screen.
     const pollBids = async () => {
-      if (stopped || !mine || !onBids) {
+      // Owner bids are applied by the owner, admins and auctioneers, not by data-entry helpers.
+      if (stopped || !mine || !onBids || role === 'data') {
         bidsRunning = false;
         return;
       }
@@ -233,7 +320,8 @@ export function createCloud(apiBase: string): Cloud {
       if (stopped) return;
       // The organiser's own browser already has everything, so it checks rarely.
       // Projectors and phones check every second while they are on screen.
-      const ms = mine ? 15000 : document.visibilityState === 'visible' ? 1000 : 5000;
+      // When the auction is shared, other admins' changes should arrive within a couple of seconds.
+      const ms = notOnline.has(id) && token ? 15000 : mine ? (shared && document.visibilityState === 'visible' ? 2000 : 15000) : document.visibilityState === 'visible' ? 1000 : 5000;
       timer = setTimeout(poll, ms);
     };
 
@@ -242,9 +330,13 @@ export function createCloud(apiBase: string): Cloud {
         const res = await request(`auction.php?id=${id}${version ? '&since=' + version : ''}`, { token });
         if (stopped) return;
         setStatus({ kind: 'on' });
+        notOnline.delete(id);
         if (res) {
           version = res.version as number;
+          versions.set(id, version);
           mine = res.mine as boolean;
+          role = (res.role as AccessRole | null) ?? null;
+          shared = !!res.shared;
           if (mine && onBids && !bidsRunning) {
             bidsRunning = true;
             void pollBids();
@@ -256,7 +348,7 @@ export function createCloud(apiBase: string): Cloud {
               photosVersion = res.photosVersion as number;
             }
           }
-          if (!stopped) onChange({ mine, updatedAt: res.updatedAt as number, state: mergePhotos(res.data as AppState, photos) });
+          if (!stopped) onChange({ mine, role, shared, version, by: String(res.by ?? ''), slug: String(res.slug ?? ''), updatedAt: res.updatedAt as number, state: mergePhotos(res.data as AppState, photos) });
         }
         if (mine && onRegistrations && !stopped) {
           const forms = ((await request('register.php?id=' + id, { token }).catch(() => null))?.items as Registration[] | undefined) ?? [];
@@ -269,6 +361,7 @@ export function createCloud(apiBase: string): Cloud {
         if (stopped) return;
         if (err instanceof HttpError && err.status === 404) {
           version = 0;
+          notOnline.add(id);
           onChange(null);
         } else if (!(err instanceof HttpError)) {
           setStatus({ kind: 'error', message: explain(err) });
@@ -283,9 +376,15 @@ export function createCloud(apiBase: string): Cloud {
       void poll();
     };
     document.addEventListener('visibilitychange', onVisible);
+    refreshers.set(id, () => {
+      version = 0;
+      if (timer) clearTimeout(timer);
+      void poll();
+    });
     void poll();
     return () => {
       stopped = true;
+      refreshers.delete(id);
       if (timer) clearTimeout(timer);
       if (bidTimer) clearTimeout(bidTimer);
       document.removeEventListener('visibilitychange', onVisible);
@@ -298,7 +397,32 @@ export function createCloud(apiBase: string): Cloud {
     (err) => setStatus({ kind: 'error', message: explain(err) }),
   );
 
+  const post = (path: string, body: unknown) => request(path, { method: 'POST', body });
+
   return {
+    clientId,
+    onSaved: (l) => void savedListeners.push(l),
+    onConflict: (l) => void conflictListeners.push(l),
+    refresh: (id) => refreshers.get(id)?.(),
+    async listMembers(id) {
+      return (await request('members.php?id=' + id)) as unknown as MemberList;
+    },
+    async inviteMember(id, email, role) {
+      await post('members.php?id=' + id, { email, role });
+    },
+    async removeMember(id, email) {
+      await post(`members.php?id=${id}&action=remove`, { email });
+    },
+    async setSlug(id, slug) {
+      try {
+        return String((await post('slug.php?id=' + id, { slug }))?.slug ?? slug);
+      } catch (err) {
+        throw new Error(err instanceof HttpError ? err.code : 'offline');
+      }
+    },
+    async leaveAuction(id) {
+      await post(`members.php?id=${id}&action=leave`, {});
+    },
     saveAuction(id, state, updatedAt, token) {
       pending.set(id, { state, updatedAt, token });
       void flush();

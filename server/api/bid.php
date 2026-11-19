@@ -72,7 +72,7 @@ if ($method === 'GET' && isset($_GET['team'])) {
 }
 
 if ($method === 'GET') {
-    require_owner($auction, require_user());
+    require_role($auction, require_user(), 'owner', 'admin', 'auctioneer');
     // Claims nobody confirmed (the app was closed in between) go back in the queue.
     $pdo->prepare('UPDATE bids SET status = 0, claim = \'\' WHERE auction_id = ? AND status = 2 AND claimed_at < ?')->execute([$id, $now - CLAIM_TIMEOUT_MS]);
     $claim = bin2hex(random_bytes(8));
@@ -87,7 +87,7 @@ if ($method === 'GET') {
 }
 
 if ($action === 'done') {
-    require_owner($auction, require_user());
+    require_role($auction, require_user(), 'owner', 'admin', 'auctioneer');
     $results = json_body(40_000)['results'] ?? null;
     if (!is_array($results) || count($results) > 100) fail(400, 'bad_results');
     $up = $pdo->prepare('UPDATE bids SET status = 1, ok = ?, tie = ?, reason = ? WHERE auction_id = ? AND id = ?');

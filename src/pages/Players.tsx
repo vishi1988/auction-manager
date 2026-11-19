@@ -9,7 +9,8 @@ import { money, uid } from '../lib/format';
 import { resizeImage } from '../lib/media';
 import { TSHIRT_SIZES, extrasSummary, tshirtRows } from '../lib/registration';
 import { basePriceOf } from '../lib/rules';
-import { update, useAppState } from '../store/store';
+import { registerLinkUrl } from '../components/RegistrationLink';
+import { update, useAppState, useRegisterSlug } from '../store/store';
 import type { ExtraTshirt, Player, PlayerStatus, Role, Tag } from '../types';
 
 const TAGS: Tag[] = ['', 'Owner', 'Captain', 'Vice Captain', 'Icon'];
@@ -101,7 +102,8 @@ export function Players() {
     setEditing(null);
   };
 
-  const copyRegistration = () => copyText(shareUrl(path('/register')), showToast, 'Registration link copied');
+  const registerSlug = useRegisterSlug();
+  const copyRegistration = () => copyText(registerSlug ? registerLinkUrl(registerSlug) : shareUrl(path('/register')), showToast, 'Registration link copied');
   const closeMenu = (e: React.MouseEvent) => (e.currentTarget.closest('details') as HTMLDetailsElement | null)?.removeAttribute('open');
   const onHold = players.filter((p) => p.status === 'hold').length;
   const shirts = useMemo(() => tshirtRows(state), [state]);

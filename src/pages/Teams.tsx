@@ -9,7 +9,7 @@ import { teamLimitReached, useAuth } from '../store/auth';
 import { money, uid } from '../lib/format';
 import { resizeImage } from '../lib/media';
 import { teamStats } from '../lib/rules';
-import { ensureOwnerKeys, update, useAppState, useCloudInfo } from '../store/store';
+import { ensureOwnerKeys, update, useAppState, useCloudInfo, useRole } from '../store/store';
 import type { Team } from '../types';
 
 const SWATCHES = ['#E5484D', '#2E5BFF', '#FF7A1A', '#7C4DDB', '#12A360', '#D6409F', '#0EA5B7', '#475467', '#B7791F', '#1E3A8A'];
@@ -44,7 +44,10 @@ export function Teams() {
     window.open((phone.length === 10 ? 'https://wa.me/91' + phone : 'https://wa.me/') + '?text=' + encodeURIComponent(text), '_blank', 'noopener');
   };
   /** Free accounts can add up to 2 teams; the third shows the Pro prompt. */
-  const addTeam = () => (teamLimitReached(teams.length) ? setProOpen(true) : setDraft(blankTeam(nextColor)));
+  // Invited helpers are not limited by their own plan: the server applies the owner's.
+  const role = useRole();
+  const limited = (role === null || role === 'owner') && teamLimitReached(teams.length);
+  const addTeam = () => (limited ? setProOpen(true) : setDraft(blankTeam(nextColor)));
 
   const remove = (team: Team) => {
     if (teamStats(state, team.id).count > 0) return showToast('Remove this team’s players first');
@@ -60,7 +63,7 @@ export function Teams() {
           <h1>Teams</h1>
           <p>{teams.length} teams · {money(settings.purse, settings.unit)} purse each · {settings.minSquad}–{settings.maxSquad} players per team</p>
         </div>
-        <button className="btn btn-primary" onClick={addTeam}><Plus size={16} />Add team{teamLimitReached(teams.length) ? ' · Pro' : ''}</button>
+        <button className="btn btn-primary" onClick={addTeam}><Plus size={16} />Add team{limited ? ' · Pro' : ''}</button>
       </div>
 
       {teams.length === 0 ? (

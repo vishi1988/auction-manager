@@ -10,8 +10,11 @@ require __DIR__ . '/_lib.php';
 require_method('GET');
 $user = require_user();
 
-$q = db()->prepare('SELECT id, name, data, created_at, updated_at FROM auctions WHERE user_id = ? ORDER BY created_at DESC LIMIT 500');
-$q->execute([$user['id']]);
+// Own auctions, plus those shared with this account's Google email.
+$q = db()->prepare("SELECT a.id, a.name, a.data, a.created_at, a.updated_at, CASE WHEN a.user_id = ? THEN 'owner' ELSE m.role END AS role
+    FROM auctions a LEFT JOIN auction_members m ON m.auction_id = a.id AND m.email = ?
+    WHERE a.user_id = ? OR m.email IS NOT NULL ORDER BY a.created_at DESC LIMIT 500");
+$q->execute([$user['id'], norm_email((string)$user['email']), $user['id']]);
 
 $list = [];
 foreach ($q->fetchAll() as $row) {
@@ -28,6 +31,7 @@ foreach ($q->fetchAll() as $row) {
         'status' => is_string($d['auction']['status'] ?? null) ? $d['auction']['status'] : 'idle',
         'createdAt' => (int)$row['created_at'],
         'updatedAt' => (int)$row['updated_at'],
+        'role' => $row['role'],
     ];
 }
 ok(['auctions' => $list]);

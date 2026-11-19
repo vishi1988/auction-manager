@@ -7,6 +7,7 @@ function stateWithImages() {
   s.players[0]!.photo = 'data:image/jpeg;base64,AAA';
   s.players[2]!.photo = 'data:image/jpeg;base64,BBB';
   s.teams[1]!.logo = 'data:image/jpeg;base64,CCC';
+  s.sponsors = [{ id: 's_1', name: 'Sai Sports', logo: 'data:image/jpeg;base64,DDD' }, { id: 's_2', name: 'No Logo Traders' }];
   return s;
 }
 
@@ -14,7 +15,7 @@ describe('photos kept apart from the auction record', () => {
   it('takes every image out of the record', () => {
     const s = stateWithImages();
     const { lean, photos } = splitPhotos(s);
-    expect(Object.keys(photos)).toHaveLength(3);
+    expect(Object.keys(photos)).toHaveLength(4);
     expect(JSON.stringify(lean)).not.toContain('data:image');
     expect(lean.players.every((p) => !('photo' in p) || !p.photo)).toBe(true);
     expect(lean.teams.every((t) => !t.logo)).toBe(true);
