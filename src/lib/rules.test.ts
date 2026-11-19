@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createDummyState } from '../data/dummy';
 import type { AppState } from '../types';
 import { confirmDraw, joinDraw, markSold, markUnsold, nextPlayer, pickPlayer, placeBid, resetAuction, resolveRtm, startAuction, undo } from './auction';
-import { atUpperLimit, checkBid, checkJoinDraw, currentPlayer, drawEntrants, leadingBid, maxBidFor, nextBidAmount, reserveAfterBuying, stepFor, teamStats } from './rules';
+import { atUpperLimit, checkBid, checkJoinDraw, currentPlayer, drawEntrants, leadingBid, limitsBelowBase, maxBidFor, nextBidAmount, reserveAfterBuying, stepFor, teamStats } from './rules';
 
 const NOW = 1_000_000;
 
@@ -110,6 +110,19 @@ describe('who can bid', () => {
     placeBid(s, 't_rs', NOW);
     placeBid(s, 't_tt', NOW);
     expect(checkBid(s, 't_rs')).toMatchObject({ ok: false, reason: 'Upper limit reached' });
+  });
+
+  it('ignores an upper limit below the base price (limits left in Crore after switching to points)', () => {
+    const s = freshState();
+    s.settings.unit = 'pts';
+    s.settings.purse = 20000;
+    for (const c of s.categories) Object.assign(c, { base: 500, increment: 500 });
+    s.categories[1]!.maxPrice = 1;
+    onBlock(s, catA(s).id);
+    expect(limitsBelowBase(s).map((c) => c.id)).toContain(s.categories[1]!.id);
+    expect(checkBid(s, 't_rs')).toMatchObject({ ok: true, amount: 500 });
+    placeBid(s, 't_rs', NOW);
+    expect(checkBid(s, 't_tt')).toMatchObject({ ok: true, amount: 1000 });
   });
 });
 

@@ -212,7 +212,7 @@ function TeamDrawer({ draft: initial, onClose, showToast }: { draft: Team; onClo
         <div className="row">
           <label className="btn btn-sm">
             {draft.logo ? 'Change logo' : 'Upload logo'}
-            <input type="file" accept="image/*" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (f) change('logo', await resizeImage(f, 160)); }} />
+            <input type="file" accept="image/*" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (f) change('logo', await resizeImage(f, 400)); }} />
           </label>
           {draft.logo && <button type="button" className="btn btn-ghost btn-sm" onClick={() => change('logo', undefined)}>Remove</button>}
         </div>

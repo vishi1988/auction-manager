@@ -28,7 +28,7 @@ export function SponsorsEditor({ sponsors }: { sponsors: Sponsor[] }) {
               onChange={async (e) => {
                 const f = e.target.files?.[0];
                 e.target.value = '';
-                if (f) patch(sp.id, { logo: await resizeImage(f, 320, '#ffffff') });
+                if (f) patch(sp.id, { logo: await resizeImage(f, 600, '#ffffff') });
               }}
             />
           </label>

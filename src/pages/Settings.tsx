@@ -6,6 +6,7 @@ import { OptionRow, Segmented, Switch, Tabs, Toast, useToast } from '../componen
 import { createDummyState } from '../data/dummy';
 import { SPORTS } from '../data/sports';
 import { resetAuction } from '../lib/auction';
+import { limitsBelowBase } from '../lib/rules';
 import { money, uid } from '../lib/format';
 import { replaceState, update, useAppState } from '../store/store';
 import type { AppState, Settings as SettingsT } from '../types';
@@ -37,6 +38,19 @@ function Section({ title, text, children }: { title: string; text: ReactNode; ch
       </header>
       <div className="set-body">{children}</div>
     </section>
+  );
+}
+
+/** Red note when an upper limit is below the base price (it is then ignored). */
+function LimitWarning({ state }: { state: AppState }) {
+  const bad = limitsBelowBase(state);
+  if (!bad.length) return null;
+  const unit = state.settings.unit;
+  return (
+    <p className="hint" role="alert" style={{ color: 'var(--danger-ink)', fontWeight: 600 }}>
+      Upper limit is below the base price for {bad.map((c) => `${c.name} (base ${money(c.base, unit)}, limit ${money(c.maxPrice ?? state.settings.maxPlayerPrice, unit)})`).join(', ')}.
+      No team could bid, so this limit is ignored. Set a higher limit or leave it empty.
+    </p>
   );
 }
 
@@ -204,6 +218,7 @@ export function Settings() {
               </table>
             </div>
             <p className="hint">"Raise by" empty = use the bid increments from the Bidding tab. "Upper limit" empty = use the auction’s upper limit (Bidding tab).</p>
+            <LimitWarning state={state} />
           </div>
         )}
 
@@ -255,6 +270,7 @@ export function Settings() {
                   , which is used instead of this one.
                 </span>
               </label>
+              <LimitWarning state={state} />
               {categories.some((c) => c.maxPrice != null) && (
                 <p className="hint">
                   Category limits: {categories.filter((c) => c.maxPrice != null).map((c) => `${c.name} ${money(c.maxPrice, settings.unit)}`).join(' · ')}

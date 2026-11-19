@@ -32,9 +32,22 @@ export function leadingBid(state: AppState) {
   return null;
 }
 
-/** Upper limit for this player: the category's own limit, else the auction's. */
+/**
+ * Upper limit for this player: the category's own limit, else the auction's.
+ * A limit below the player's base price is a setup mistake (for example limits
+ * left in ₹ Crore after switching to points): nobody could bid, so it is ignored.
+ */
 export function upperLimitFor(state: AppState, player: Player): number | null {
-  return categoryOf(state, player).maxPrice ?? state.settings.maxPlayerPrice ?? null;
+  const cap = categoryOf(state, player).maxPrice ?? state.settings.maxPlayerPrice ?? null;
+  return cap != null && cap < basePriceOf(state, player) - EPS ? null : cap;
+}
+
+/** Categories whose upper limit (own, or the auction's) is below their base price. */
+export function limitsBelowBase(state: AppState): Category[] {
+  return state.categories.filter((c) => {
+    const cap = c.maxPrice ?? state.settings.maxPlayerPrice ?? null;
+    return cap != null && cap < c.base - EPS;
+  });
 }
 
 /** True once the bidding on the current player has reached its upper limit. */

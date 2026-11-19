@@ -1,21 +1,35 @@
-/** Shrinks a photo so it fits comfortably in browser storage (~15 KB). */
-export function resizeImage(file: File, size = 240, background?: string): Promise<string> {
+/**
+ * Prepares an uploaded photo: at most `size` pixels on its longest side, as a
+ * JPEG of at most `maxBytes` (as a data: URL). Sharp enough for a projector,
+ * small enough to share with phones. Quality only drops when a photo would be too big.
+ */
+export function resizeImage(file: File, size = 800, background?: string, maxBytes = 190_000): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      const scale = size / Math.max(img.width, img.height);
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.width * Math.min(1, scale));
-      canvas.height = Math.round(img.height * Math.min(1, scale));
-      const g = canvas.getContext('2d')!;
-      if (background) {
-        // Logos with a see-through background would turn black as a JPEG.
-        g.fillStyle = background;
-        g.fillRect(0, 0, canvas.width, canvas.height);
-      }
-      g.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(img.src);
-      resolve(canvas.toDataURL('image/jpeg', 0.8));
+      let side = size;
+      for (;;) {
+        const scale = Math.min(1, side / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const g = canvas.getContext('2d')!;
+        g.imageSmoothingQuality = 'high';
+        if (background) {
+          // Logos with a see-through background would turn black as a JPEG.
+          g.fillStyle = background;
+          g.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        g.drawImage(img, 0, 0, canvas.width, canvas.height);
+        for (const q of [0.9, 0.85, 0.8, 0.72]) {
+          const url = canvas.toDataURL('image/jpeg', q);
+          if (url.length <= maxBytes) return resolve(url);
+        }
+        // Still too big (a very detailed photo): try a little smaller.
+        if (side <= 320) return resolve(canvas.toDataURL('image/jpeg', 0.65));
+        side = Math.round(side * 0.8);
+      }
     };
     img.onerror = reject;
     img.src = URL.createObjectURL(file);
