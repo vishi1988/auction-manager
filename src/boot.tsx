@@ -21,6 +21,8 @@ const Players = page(() => import('./pages/Players'), 'Players');
 const Team = page(() => import('./pages/Team'), 'Team');
 const Console = page(() => import('./pages/Console'), 'Console');
 const Results = page(() => import('./pages/Results'), 'Results');
+const Matches = page(() => import('./pages/Matches'), 'Matches');
+const Tournament = page(() => import('./pages/Tournament'), 'Tournament');
 const Live = page(() => import('./pages/Live'), 'Live');
 const Overlay = page(() => import('./pages/Overlay'), 'Overlay');
 const Owner = page(() => import('./pages/Owner'), 'Owner');
@@ -59,9 +61,11 @@ createRoot(document.getElementById('root')!).render(
               <Route path="console" element={<RequireRole area="console"><Console /></RequireRole>} />
               <Route path="results" element={<RequireRole area="results"><Results /></RequireRole>} />
               <Route path="team" element={<RequireRole area="team"><Team /></RequireRole>} />
+              <Route path="matches" element={<RequireRole area="matches"><Matches /></RequireRole>} />
             </Route>
             {/* Public screens: no admin menu */}
             <Route path="live" element={<Live />} />
+            <Route path="tournament" element={<Tournament />} />
             <Route path="overlay" element={<Overlay />} />
             <Route path="owner" element={<Owner />} />
             <Route path="owner/:teamId" element={<Owner />} />

@@ -35,7 +35,7 @@ export function AuctionRoute() {
     );
   }
   // In the embed preview, public screens open in place, so give them a way back.
-  const publicScreen = /\/(live|overlay|owner|register)(\/|$)/.test(pathname);
+  const publicScreen = /\/(live|overlay|owner|register|tournament)(\/|$)/.test(pathname);
   return (
     <>
       {/* key: remount pages when switching auctions so local page state resets. */}

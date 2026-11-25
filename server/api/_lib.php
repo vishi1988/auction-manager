@@ -12,9 +12,10 @@
 // - Anyone who has an auction's link may read it, which is how the live
 //   screen works on a projector or a phone.
 // - The owner can invite others by Google email (members.php). A member has a
-//   role: admin (everything but deleting), auctioneer (runs the console) or
-//   data (adds players and teams). The server lets all three save the
-//   auction; which screens each role gets is decided in the app.
+//   role: admin (everything but deleting), auctioneer (runs the console),
+//   data (adds players and teams) or scorer (fills in match scores). The
+//   server lets all of them save the auction, but a scorer's save only changes
+//   the tournament (auction.php); which screens each role gets is decided in the app.
 
 declare(strict_types=1);
 
@@ -300,7 +301,7 @@ function auction_headline(array $row): array
     ];
 }
 
-const MEMBER_ROLES = ['admin', 'auctioneer', 'data'];
+const MEMBER_ROLES = ['admin', 'auctioneer', 'data', 'scorer'];
 const MAX_MEMBERS = 12;
 
 function norm_email(string $email): string
@@ -311,7 +312,7 @@ function norm_email(string $email): string
 /**
  * What this request is to the auction: 'owner' (its account, or the browser
  * holding the token of an auction not yet in any account), an invited
- * 'admin' / 'auctioneer' / 'data', or null for everyone else.
+ * 'admin' / 'auctioneer' / 'data' / 'scorer', or null for everyone else.
  */
 function role_of(array $auction, ?array $user): ?string
 {
@@ -329,7 +330,7 @@ function role_of(array $auction, ?array $user): ?string
     return $h !== null && hash_equals($auction['owner_hash'], $h) ? 'owner' : null;
 }
 
-/** True when this request may change the auction: its owner, or an invited admin, auctioneer or data-entry member. */
+/** True when this request may change the auction: its owner, or any invited member. */
 function can_edit(array $auction, ?array $user): bool
 {
     return role_of($auction, $user) !== null;

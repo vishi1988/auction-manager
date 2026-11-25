@@ -1,12 +1,51 @@
 import { Download, Share2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { shareCanvas, soldCard, squadCard } from '../lib/cards';
+import { matchName, resultText } from '../lib/tournament';
+import { awardsCard, potmCard, resultCard } from '../lib/tournamentCards';
 import { money } from '../lib/format';
 import { teamStats } from '../lib/rules';
-import type { AppState, Player, Team } from '../types';
+import type { AppState, Match, Player, Team } from '../types';
 import { Drawer } from './ui';
 
-export type CardTarget = { kind: 'sold'; player: Player } | { kind: 'squad'; team: Team };
+export type CardTarget =
+  | { kind: 'sold'; player: Player }
+  | { kind: 'squad'; team: Team }
+  | { kind: 'result'; match: Match }
+  | { kind: 'potm'; match: Match; playerId: string }
+  | { kind: 'awards' };
+
+/** Title of the share panel and the words sent along with the picture. */
+function describe(state: AppState, target: CardTarget): { title: string; text: string } {
+  const unit = state.settings.unit;
+  const event = state.settings.name;
+  switch (target.kind) {
+    case 'sold': {
+      const team = state.teams.find((t) => t.id === target.player.teamId);
+      return { title: target.player.name, text: `${target.player.name} ${target.player.status === 'retained' ? 'retained by' : 'SOLD to'} ${team?.name ?? ''} for ${money(target.player.price, unit)} · ${event}` };
+    }
+    case 'squad':
+      return { title: target.team.name + ' squad', text: `${target.team.name} squad (${teamStats(state, target.team.id).count} players) · ${event}` };
+    case 'result':
+      return { title: matchName(target.match) + ' result', text: `${resultText(state, target.match)} · ${matchName(target.match)} · ${event}` };
+    case 'potm': {
+      const p = state.players.find((x) => x.id === target.playerId);
+      return { title: 'Player of the Match', text: `⭐ Player of the Match: ${p?.name ?? ''} · ${matchName(target.match)} · ${event}` };
+    }
+    case 'awards':
+      return { title: 'Tournament awards', text: `🏆 Tournament awards · ${event}` };
+  }
+}
+
+function draw(state: AppState, target: CardTarget): Promise<HTMLCanvasElement> {
+  switch (target.kind) {
+    case 'sold': return soldCard(state, target.player);
+    case 'squad': return squadCard(state, target.team);
+    case 'result': return resultCard(state, target.match);
+    case 'potm': return potmCard(state, target.match, target.playerId);
+    case 'awards': return awardsCard(state);
+  }
+}
 
 /** Preview of a share picture with Share and Download buttons. */
 export function ShareCard({ state, target, onClose, showToast }: { state: AppState; target: CardTarget; onClose: () => void; showToast: (m: string) => void }) {
@@ -14,19 +53,14 @@ export function ShareCard({ state, target, onClose, showToast }: { state: AppSta
   const [failed, setFailed] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const team = target.kind === 'sold' ? state.teams.find((t) => t.id === target.player.teamId) : target.team;
-  const title = target.kind === 'sold' ? target.player.name : target.team.name + ' squad';
-  const text =
-    target.kind === 'sold'
-      ? `${target.player.name} ${target.player.status === 'retained' ? 'retained by' : 'SOLD to'} ${team?.name ?? ''} for ${money(target.player.price, state.settings.unit)} · ${state.settings.name}`
-      : `${target.team.name} squad (${teamStats(state, target.team.id).count} players) · ${state.settings.name}`;
+  const { title, text } = describe(state, target);
   const fileName = (state.settings.name + ' - ' + title).replace(/[^\w -]+/g, '').trim() + '.png';
 
   useEffect(() => {
     let cancelled = false;
     setUrl(null);
     setFailed(false);
-    (target.kind === 'sold' ? soldCard(state, target.player) : squadCard(state, target.team)).then(
+    draw(state, target).then(
       (c) => {
         if (cancelled) return;
         canvasRef.current = c;

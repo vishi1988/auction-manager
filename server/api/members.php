@@ -9,8 +9,9 @@
 // POST members.php?id=ID&action=leave                          a member leaves the auction
 //
 // Roles: admin (everything except deleting the auction and managing admins),
-// auctioneer (runs the console), data (adds players and teams). Only the owner
-// can add, change or remove an admin; admins can manage the other two roles.
+// auctioneer (runs the console), data (adds players and teams), scorer (fills
+// in match scores only). Only the owner can add, change or remove an admin;
+// admins can manage the other roles.
 // People are matched by the verified Google email they sign in with.
 
 declare(strict_types=1);

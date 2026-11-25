@@ -198,7 +198,7 @@ export interface Organizer {
 
 /** Summary of one auction, shown on the "My Auctions" page without loading all its data. */
 /** What a person is to an auction: the owner, or someone the owner invited (see members.php). */
-export type AccessRole = 'owner' | 'admin' | 'auctioneer' | 'data';
+export type AccessRole = 'owner' | 'admin' | 'auctioneer' | 'data' | 'scorer';
 
 export interface AuctionMeta {
   id: string;
@@ -225,4 +225,100 @@ export interface AppState {
   log: LogEntry[];
   /** Sponsors of the tournament, in the order they are shown. */
   sponsors?: Sponsor[];
+  /** Matches played after the auction, with scores and awards. Missing until the organiser sets it up. */
+  tournament?: Tournament;
+}
+
+// ---------- tournament: fixtures, scores and awards after the auction ----------
+
+/** Knockout stages that follow the league (or replace it when there is no league). */
+export type KnockoutFormat = 'none' | 'final' | 'semis' | 'quarters' | 'playoffs';
+
+export type MatchStage = 'league' | 'qf' | 'sf' | 'q1' | 'elim' | 'q2' | 'third' | 'final';
+
+/** Extra points in the award table when a player reaches a mark in one match (e.g. 50 runs: +20). */
+export interface StatBonus {
+  stat: string;
+  atLeast: number;
+  points: number;
+}
+
+export interface TournamentSettings {
+  /** How many times each team plays every other team in its group (0 = no league, straight to knockouts). */
+  leagueRounds: number;
+  /** Number of league groups (1 = all teams together). */
+  groups: number;
+  knockout: KnockoutFormat;
+  /** Match for 3rd place between the semi-final losers. */
+  thirdPlace: boolean;
+  /** Cricket: overs per innings, balls per over and players per side (for "all out" and "won by N wickets"). */
+  overs: number;
+  ballsPerOver: number;
+  playersPerSide: number;
+  points: { win: number; draw: number; noResult: number; loss: number };
+  /** Player of the Match: 'auto' gives it to the top scorer of award points, 'manual' lets the organiser choose. */
+  potm: 'auto' | 'manual';
+  /** Player of the Series, same choice. */
+  pots: 'auto' | 'manual';
+  /** Award points per unit of each stat (keys from the sport's stat list). */
+  weights: Record<string, number>;
+  /** Milestone bonuses; only the highest one reached per stat counts. */
+  bonuses: StatBonus[];
+}
+
+/** One side of a match: a known team, or a place to be filled ("A1" = group A winner, "W:<match id>" = winner of a match). */
+export interface Slot {
+  teamId?: string | null;
+  from?: string;
+}
+
+export interface SideScore {
+  /** Runs / goals / points / sets. */
+  score: number;
+  /** Cricket only. */
+  wickets?: number;
+  balls?: number;
+  allOut?: boolean;
+  extras?: number;
+}
+
+export type MatchResult = 'a' | 'b' | 'draw' | 'nr';
+
+export interface Match {
+  id: string;
+  /** Match number shown to people ("Match 7"). */
+  no: number;
+  stage: MatchStage;
+  /** League group letter. */
+  group?: string;
+  a: Slot;
+  b: Slot;
+  date: string;
+  time: string;
+  ground: string;
+  status: 'upcoming' | 'done' | 'abandoned';
+  /** Cricket: overs for this match when different from the tournament setting (rain, short final). */
+  overs?: number | null;
+  toss?: { side: 'a' | 'b'; chose: 'bat' | 'bowl' } | null;
+  /** Cricket: which side batted first. */
+  battedFirst?: 'a' | 'b' | null;
+  scoreA?: SideScore | null;
+  scoreB?: SideScore | null;
+  /** Set by the organiser to override the result worked out from the score (super over, walkover). */
+  result?: MatchResult | null;
+  /** Short note shown with the result, e.g. "Won the super over". */
+  note?: string;
+  /** Each player's numbers in this match: player id -> stat key -> value. */
+  stats: Record<string, Record<string, number>>;
+  /** Players who played for a side without being in its squad (guest, substitute). */
+  subs?: { a?: string[]; b?: string[] };
+  /** Player of the Match chosen by the organiser (manual mode, or overriding auto). */
+  potm?: string | null;
+}
+
+export interface Tournament {
+  settings: TournamentSettings;
+  matches: Match[];
+  /** Player of the Series chosen by the organiser. */
+  pots?: string | null;
 }

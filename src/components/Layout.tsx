@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, Gavel, LayoutDashboard, LayoutGrid, Menu, MonitorPlay, Plus, Settings2, ShieldCheck, Trophy, UserRound, UsersRound } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Check, Gavel, Globe, LayoutDashboard, LayoutGrid, Menu, MonitorPlay, Plus, Settings2, ShieldCheck, Trophy, UserRound, UsersRound } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { APP_NAME, APP_TAGLINE } from '../brand';
@@ -137,6 +137,8 @@ export function AuctionLayout() {
 
           <div className="nav-label">After</div>
           <NavLink to={path('/results')} className="nav-item"><Trophy size={18} />Results</NavLink>
+          {canOpen(role, 'matches') && <NavLink to={path('/matches')} className="nav-item"><CalendarDays size={18} />Matches &amp; scores</NavLink>}
+          <ScreenLink to={path('/tournament')} className="nav-item"><Globe size={18} />Tournament page ↗</ScreenLink>
         </>
       }
     />

@@ -5,12 +5,12 @@ import type { AppState, Player, Sponsor, Team } from '../types';
 import { initials, money } from './format';
 import { categoryOf, teamStats } from './rules';
 
-const W = 1080;
-const DISPLAY = "'Barlow Condensed', 'Arial Narrow', sans-serif";
-const BODY = "'Plus Jakarta Sans', system-ui, sans-serif";
-const GOLD = '#f2b631';
+export const W = 1080;
+export const DISPLAY = "'Barlow Condensed', 'Arial Narrow', sans-serif";
+export const BODY = "'Plus Jakarta Sans', system-ui, sans-serif";
+export const GOLD = '#f2b631';
 
-function loadImage(src: string | undefined): Promise<HTMLImageElement | null> {
+export function loadImage(src: string | undefined): Promise<HTMLImageElement | null> {
   if (!src) return Promise.resolve(null);
   return new Promise((resolve) => {
     const img = new Image();
@@ -20,18 +20,18 @@ function loadImage(src: string | undefined): Promise<HTMLImageElement | null> {
   });
 }
 
-async function ready() {
+export async function ready() {
   // Canvas only uses a web font once the browser has loaded that weight.
   await Promise.all([`700 60px ${DISPLAY}`, `600 30px ${BODY}`, `800 30px ${BODY}`].map((f) => document.fonts?.load(f).catch(() => null)));
 }
 
-function roundRect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+export function roundRect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   g.beginPath();
   g.roundRect(x, y, w, h, r);
 }
 
 /** Draws text, shrinking the font until it fits `maxWidth`. */
-function fitText(g: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, weight: number, size: number, family: string) {
+export function fitText(g: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, weight: number, size: number, family: string) {
   let s = size;
   do {
     g.font = `${weight} ${s}px ${family}`;
@@ -41,7 +41,7 @@ function fitText(g: CanvasRenderingContext2D, text: string, x: number, y: number
 }
 
 /** Image covering a box, cropped from the centre (top-weighted, so faces stay in). */
-function cover(g: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number) {
+export function cover(g: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number) {
   const scale = Math.max(w / img.width, h / img.height);
   const sw = w / scale;
   const sh = h / scale;
@@ -53,7 +53,7 @@ function contain(g: CanvasRenderingContext2D, img: HTMLImageElement, x: number, 
   g.drawImage(img, x + (w - img.width * scale) / 2, y + (h - img.height * scale) / 2, img.width * scale, img.height * scale);
 }
 
-function backdrop(g: CanvasRenderingContext2D, h: number, color: string) {
+export function backdrop(g: CanvasRenderingContext2D, h: number, color: string) {
   g.fillStyle = '#070b16';
   g.fillRect(0, 0, W, h);
   const glow = g.createRadialGradient(W / 2, 0, 0, W / 2, 0, h * 0.9);
@@ -70,17 +70,17 @@ function backdrop(g: CanvasRenderingContext2D, h: number, color: string) {
   g.stroke();
 }
 
-function header(g: CanvasRenderingContext2D, state: AppState) {
+export function header(g: CanvasRenderingContext2D, state: AppState, subtitle = 'PLAYER AUCTION') {
   g.textAlign = 'center';
   g.textBaseline = 'alphabetic';
   g.fillStyle = '#ffffff';
   fitText(g, state.settings.name.toUpperCase(), W / 2, 112, W - 160, 700, 54, DISPLAY);
   g.fillStyle = '#aab6ca';
   g.font = `800 20px ${BODY}`;
-  g.fillText('P L A Y E R   A U C T I O N', W / 2, 150);
+  g.fillText(subtitle.split('').join(' '), W / 2, 150);
 }
 
-async function teamBadge(g: CanvasRenderingContext2D, team: Team, cx: number, cy: number, r: number) {
+export async function teamBadge(g: CanvasRenderingContext2D, team: Team, cx: number, cy: number, r: number) {
   const logo = await loadImage(team.logo);
   g.save();
   g.beginPath();
@@ -101,7 +101,7 @@ async function teamBadge(g: CanvasRenderingContext2D, team: Team, cx: number, cy
 }
 
 /** Sponsors along the bottom, then the product line. `top` is where the strip starts. */
-async function footer(g: CanvasRenderingContext2D, sponsors: Sponsor[], top: number, h: number) {
+export async function footer(g: CanvasRenderingContext2D, sponsors: Sponsor[], top: number, h: number) {
   const shown = sponsors.filter((s) => s.logo || s.name.trim()).slice(0, 4);
   if (shown.length) {
     g.textAlign = 'center';

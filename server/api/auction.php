@@ -3,7 +3,7 @@
 //
 // GET  auction.php?id=ID[&since=VERSION]
 //      200 {version, updatedAt, photosVersion, mine, role, shared, by, slug, data}
-//      (`role`: owner, admin, auctioneer, data, or null; `by`: device that saved last)
+//      (`role`: owner, admin, auctioneer, data, scorer, or null; `by`: device that saved last)
 //      204 when `since` already equals the current version (nothing new)
 //      404 when there is no such auction
 // POST auction.php?id=ID                 body {name, updatedAt, data, base?, client?}   (signed in)
@@ -115,6 +115,19 @@ if (!$existing) {
 }
 
 require_owner($existing, $user);
+// A scorer may only fill in matches and scores: everything else is kept as it
+// was on the server, whatever their device sent.
+if (role_of($existing, $user) === 'scorer') {
+    $old = db()->prepare('SELECT name, data FROM auctions WHERE id = ?');
+    $old->execute([$id]);
+    $oldRow = $old->fetch();
+    $kept = json_decode((string)($oldRow['data'] ?? ''), true);
+    if (!is_array($kept)) fail(500, 'save_failed');
+    if (array_key_exists('tournament', $data)) $kept['tournament'] = $data['tournament'];
+    $json = json_encode($kept, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($json === false || strlen($json) > MAX_AUCTION_BYTES) fail(413, 'too_large');
+    $name = (string)$oldRow['name'];
+}
 // COALESCE: an auction saved before sign-in existed now belongs to this account.
 // With `base` and `client`, the save only goes through when nobody else saved
 // since this device last looked (checked inside the UPDATE, so two saves at

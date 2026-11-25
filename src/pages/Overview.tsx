@@ -1,4 +1,4 @@
-import { ArrowRight, CalendarDays, Check, ClipboardList, Copy, Gavel, MapPin, MonitorPlay, Play, Radio, Settings2, Trophy, UserPlus, Users, UsersRound, Wallet } from 'lucide-react';
+import { ArrowRight, CalendarDays, Check, ClipboardList, Copy, Gavel, Globe, MapPin, MonitorPlay, Play, Radio, Settings2, Trophy, UserPlus, Users, UsersRound, Wallet } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { ProPrompt } from '../components/ProPrompt';
 import { RegistrationLinkRow } from '../components/RegistrationLink';
@@ -77,6 +77,7 @@ export function Overview() {
     { label: 'Live screen', hint: 'Open on the projector or TV', path: '/live', icon: <MonitorPlay size={18} />, tone: 'tone-blue' },
     { label: 'Player registration', hint: 'Players fill their own details', path: '/register', icon: <ClipboardList size={18} />, tone: 'tone-green' },
     { label: 'Team owner bidding', hint: 'Owners bid from their phones', path: '/owner', icon: <UsersRound size={18} />, tone: 'tone-orange' },
+    { label: 'Tournament page', hint: 'Fixtures, results, table and stats for everyone', path: '/tournament', icon: <Globe size={18} />, tone: 'tone-green' },
     { label: 'YouTube overlay', hint: 'Add in OBS as a browser source, over the camera', path: '/overlay', open: '/overlay?bg=preview', icon: <Radio size={18} />, tone: 'tone-dark' },
   ];
 

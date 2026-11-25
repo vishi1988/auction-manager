@@ -66,7 +66,7 @@ export function Team() {
   const isOwner = list?.role === 'owner';
   const canManage = !!list?.canManage;
   const inviteText = (to: string, as: MemberRole) =>
-    `You are invited to help run "${settings.name}" on KhiladiAuction as ${ROLE_LABEL[as]}.\n1. Open ${shareUrl(path(''))}\n2. Sign in with Google using ${to}\nThe auction then shows in My Auctions.`;
+    `You are invited to help run "${settings.name}" on KhiladiAuction as ${ROLE_LABEL[as]}.\n1. Open ${shareUrl(path(as === 'scorer' ? '/matches' : ''))}\n2. Sign in with Google using ${to}\nThe auction then shows in My Auctions.`;
   const whatsapp = (to: string, as: MemberRole) => 'https://wa.me/?text=' + encodeURIComponent(inviteText(to, as));
 
   const act = async (job: () => Promise<void>, done: string) => {
@@ -207,7 +207,7 @@ export function Team() {
           <section className="card">
             <h2>What each role can do</h2>
             <div style={{ display: 'grid', gap: 10 }}>
-              {(['owner', 'admin', 'auctioneer', 'data'] as const).map((r) => (
+              {(['owner', ...MEMBER_ROLES] as const).map((r) => (
                 <div key={r} className="row" style={{ flexWrap: 'nowrap', alignItems: 'flex-start', gap: 12 }}>
                   <span className={'pill ' + (r === 'owner' ? 'pill-dark' : 'pill-blue')} style={{ minWidth: 92, justifyContent: 'center' }}>{ROLE_LABEL[r]}</span>
                   <span className="muted" style={{ fontSize: 13.5 }}>{ROLE_HELP[r]}</span>
