@@ -195,3 +195,20 @@ export function rtmCandidate(state: AppState): string | null {
   if (lead.amount > maxBidFor(state, prev.id, player) + EPS) return null;
   return prev.id;
 }
+
+/**
+ * Players still marked as retained or sold by a team that no longer exists
+ * (for example the team was deleted, or two devices changed it at once).
+ * They are stuck: no team shows them and they cannot be picked again.
+ */
+export function orphanedPlayers(state: AppState): Player[] {
+  const ids = new Set(state.teams.map((t) => t.id));
+  return state.players.filter((p) => p.teamId && !ids.has(p.teamId));
+}
+
+/** Puts orphaned players back in the pool so they can be retained or auctioned again. Changes `state`. */
+export function releaseOrphans(state: AppState): number {
+  const stuck = orphanedPlayers(state);
+  for (const p of stuck) Object.assign(p, { status: 'available', teamId: null, price: null });
+  return stuck.length;
+}

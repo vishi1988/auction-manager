@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createDummyState } from '../data/dummy';
 import type { AppState } from '../types';
 import { confirmDraw, joinDraw, markSold, markUnsold, nextPlayer, pickPlayer, placeBid, resetAuction, resolveRtm, startAuction, undo } from './auction';
-import { atUpperLimit, checkBid, checkJoinDraw, currentPlayer, drawEntrants, leadingBid, limitsBelowBase, maxBidFor, nextBidAmount, reserveAfterBuying, stepFor, teamStats } from './rules';
+import { atUpperLimit, checkBid, checkJoinDraw, currentPlayer, drawEntrants, leadingBid, limitsBelowBase, maxBidFor, nextBidAmount, orphanedPlayers, releaseOrphans, reserveAfterBuying, stepFor, teamStats } from './rules';
 
 const NOW = 1_000_000;
 
@@ -323,5 +323,25 @@ describe('auction flow', () => {
     expect(s.players.filter((p) => p.status === 'sold')).toHaveLength(0);
     expect(s.players.filter((p) => p.status === 'retained')).toHaveLength(6);
     expect(s.log).toHaveLength(0);
+  });
+});
+
+describe('players left behind by a deleted team', () => {
+  it('go back to the pool so they can be retained again', () => {
+    const s = freshState();
+    const p = s.players.find((x) => x.status === 'available')!;
+    Object.assign(p, { status: 'retained', teamId: 't_gone', price: 4000 });
+    expect(orphanedPlayers(s).map((x) => x.id)).toEqual([p.id]);
+    expect(releaseOrphans(s)).toBe(1);
+    expect(p).toMatchObject({ status: 'available', teamId: null, price: null });
+    expect(orphanedPlayers(s)).toEqual([]);
+  });
+
+  it('leave players of existing teams alone', () => {
+    const s = freshState();
+    const p = s.players.find((x) => x.status === 'available')!;
+    Object.assign(p, { status: 'retained', teamId: s.teams[0]!.id, price: 100 });
+    expect(releaseOrphans(s)).toBe(0);
+    expect(p.status).toBe('retained');
   });
 });

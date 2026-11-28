@@ -8,8 +8,8 @@ import { Drawer, EmptyState, TeamBadge, Toast, copyText, useToast } from '../com
 import { teamLimitReached, useAuth } from '../store/auth';
 import { money, uid } from '../lib/format';
 import { resizeImage } from '../lib/media';
-import { teamStats } from '../lib/rules';
-import { ensureOwnerKeys, update, useAppState, useCloudInfo, useRole } from '../store/store';
+import { orphanedPlayers, releaseOrphans, teamStats } from '../lib/rules';
+import { ensureOwnerKeys, isViewOnly, update, useAppState, useCloudInfo, useRole } from '../store/store';
 import type { Team } from '../types';
 
 const SWATCHES = ['#E5484D', '#2E5BFF', '#FF7A1A', '#7C4DDB', '#12A360', '#D6409F', '#0EA5B7', '#475467', '#B7791F', '#1E3A8A'];
@@ -31,6 +31,12 @@ export function Teams() {
   useAuth(); // re-render when the plan changes
   // Every team gets a secret key for its private bidding link.
   useEffect(() => ensureOwnerKeys(), [teams.length]);
+  // A player retained by a team that was later deleted would otherwise stay
+  // hidden for good: put them back in the pool so they can be retained again.
+  const stuck = orphanedPlayers(state).length;
+  useEffect(() => {
+    if (stuck && !isViewOnly()) update((s) => void releaseOrphans(s));
+  }, [stuck]);
   /** The team's private bidding link, for WhatsApp. Only works once the auction is online. */
   const ownerLink = (t: Team) => (t.ownerKey ? shareUrl(path('/owner/' + t.id) + '?k=' + t.ownerKey) : '');
   const copyOwnerLink = (t: Team) => {
@@ -50,9 +56,15 @@ export function Teams() {
   const addTeam = () => (limited ? setProOpen(true) : setDraft(blankTeam(nextColor)));
 
   const remove = (team: Team) => {
-    if (teamStats(state, team.id).count > 0) return showToast('Remove this team’s players first');
-    if (!confirm('Delete ' + team.name + '?')) return;
-    update((s) => void (s.teams = s.teams.filter((t) => t.id !== team.id)));
+    const squad = teamStats(state, team.id).squad;
+    if (squad.some((p) => p.status === 'sold')) return showToast('This team has bought players. Undo those sales first.');
+    const kept = squad.filter((p) => p.status === 'retained');
+    if (!confirm('Delete ' + team.name + '?' + (kept.length ? `
+${kept.map((p) => p.name).join(', ')} will go back to the player pool.` : ''))) return;
+    update((s) => {
+      s.teams = s.teams.filter((t) => t.id !== team.id);
+      releaseOrphans(s);
+    });
   };
 
   return (
